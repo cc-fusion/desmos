@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Round soft body simulation</title>
+  <style>
+    canvas {
+      aspect-ratio: 1/1;
+      max-width: 100%;
+      max-height: 100%;
+      width: 100%;
+      background-color: #ffffff;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    let internalSize = 2000
+      canvas.width = internalSize
+      canvas.height = internalSize
+      let ctx = canvas.getContext("2d")
+      class SoftBody {
+        constructor(x, y, radius, mass, numPts) {
+          this.x = x
+          this.y = y
+          this.pts = []
+          this.velX = 0
+          this.velY = 0
+          this.mass = mass
+          for (let i = 0; i < Math.PI*2; i += Math.PI*2 / numPts) {
+            this.pts.push({
+              x: x + radius * Math.cos(i),
+              y: y + radius * Math.sin(i),
+              velX: 0,
+              velY: 0,
+              mass: mass/numPts,
+              targetAngle: i,
+            })
+          }
+        }
+      }
+      function distance(x1, y1, x2, y2) {
+        if (typeof x1 == "object") {
+          return Math.sqrt((x1.x-y1.x)**2+(x1.y-y1.y)**2)
+        }
+        return Math.sqrt((x1-x2)**2+(y1-y2)**2)
+      }
+      function update() {
+        for (let body of bodies) {
+          body.x += body.velX
+          body.y += body.velY
+          body.velX /= 1.01
+          body.velY /= 1.01
+          for (let pt of body.pts) {
+            pt.x += pt.velX
+            pt.y += pt.velY
+            pt.velX /= 1.01
+            pt.velY /= 1.01
+            let forceX = 1/(body.x - pt.x)
+            let forceY = 1/(body.y - pt.y)
+            pt.velX += forceX/pt.mass
+            pt.velY += forceY/pt.mass
+            body.velX -= forceX/body.mass
+            body.velY -= forceY/body.mass
+          }
+        }
+      }
+      let debug = 1
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        for (let body of bodies) {
+          ctx.fillStyle = "#f00"
+          ctx.lineWidth = 1
+          ctx.strokeStyle = "#000"
+          if (debug) {
+            for (let pt of body.pts) {
+              // line from center
+              ctx.beginPath()
+              ctx.moveTo(body.x, body.y)
+              ctx.lineTo(pt.x, pt.y)
+              ctx.stroke()
+              // actual endpoint dot
+              ctx.beginPath()
+              ctx.arc(pt.x, pt.y, 7.5, 0, 6.29)
+              ctx.fill()
+            }
+            // center dot
+            ctx.beginPath()
+            ctx.arc(body.x, body.y, 20, 0, 6.29)
+            ctx.fill()
+          } else {
+            // draw borders
+            ctx.beginPath()
+            ctx.moveTo(body.pts[0].x, body.pts[0].y)
+            for (let pt of body.pts) {
+              ctx.lineTo(pt.x, pt.y)
+            }
+            ctx.lineTo(body.pts[0].x, body.pts[0].y)
+            ctx.stroke()
+          }
+        }
+      }
+      let bodies = [
+        new SoftBody(1000, 1000, 200, 1, 25)
+      ]
+      bodies[0].velX += 1
+      let lastDraw = 0
+      let frameRate = 60
+      function animate() {
+        if (Date.now() - lastDraw < 1000/frameRate) {
+          requestAnimationFrame(animate)
+          return
+        }
+        update()
+        render()
+        lastDraw = Date.now()
+        requestAnimationFrame(animate)
+      }
+      requestAnimationFrame(animate)
+  </script>
+</body>
+
+</html>
