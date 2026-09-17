@@ -58,8 +58,15 @@
             pt.y += pt.velY
             pt.velX /= 1.01
             pt.velY /= 1.01
-            let forceX = 1/(body.x - pt.x)
-            let forceY = 1/(body.y - pt.y)
+            // F = -kx
+
+            let springConstant = 1
+            let displacementX = body.radius - (body.x - pt.x)
+            let displacementY = body.radius - (body.y - pt.y)
+            let forceX = springConstant * displacementX
+            let forceY = springConstant * displacementY
+
+            // a = F/m
             pt.velX += forceX/pt.mass
             pt.velY += forceY/pt.mass
             body.velX -= forceX/body.mass
