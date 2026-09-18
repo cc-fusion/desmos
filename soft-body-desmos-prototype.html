@@ -22,11 +22,11 @@
     canvas.width = internalSize
     canvas.height = internalSize
     let ctx = canvas.getContext("2d")
-    function calculateAvgAngle(pos) {
+    function calculateAvgAngle(pos, center) {
       let totalCos = 0
       let totalSin = 0
       for (let p of pos) {
-        let currAngle = Math.atan2(this.initCenterY - p.y, this.initCenterX - p.x)
+        let currAngle = Math.atan2(center.y - p.y, center.x - p.x)
         totalCos += Math.cos(currAngle)
         totalSin += Math.sin(currAngle)
       }
@@ -56,13 +56,10 @@
       constructor(pos) {
         this.initPos = pos
         
-        let center = getCenter(pos)
-        this.initCenterX = center.x
-        this.initCenterY = center.y
+        this.initCenter = getCenter(pos)
 
-        this.initAvgAngle = calculateAvgAngle(pos)
+        this.initAvgAngle = calculateAvgAngle(pos,this.initCenter)
         
-        if (deployment == "dev") this.initPos = Object.freeze(pos)
         this.pos = pos
         this.vel = []
         for (let p of pos) {
@@ -73,31 +70,31 @@
         // 1. Update velocity
         
         for (let i = 0; i < this.pos.length; i++) {
-          this.pos.x[i] += this.vel.x[i]
-          this.pos.y[i] += this.vel.y[i]
-          this.vel.x[i] /= 1.01
-          this.vel.y[i] /= 1.01
+          this.pos[i].x += this.vel[i].x
+          this.pos[i].y += this.vel[i].y
+          this.vel[i].x /= 1.01
+          this.vel[i].y /= 1.01
         }
         let center = getCenter(this.pos)
 
         let offset = {
-          x: center.x - this.initCenterX,
-          y: center.y - this.initCenterY,
+          x: center.x - this.initCenter.x,
+          y: center.y - this.initCenter.x,
         }
 
-        let avgAngle = calculateAvgAngle(pos)
+        let avgAngle = calculateAvgAngle(this.pos, this.initPos)
         let optimalRotation = this.initAvgAngle - avgAngle
 
         for (let i = 0; i < this.pos.length; i++) {
           // translate
           let targetPos = {
-            x: this.initialPos[i].x + offsetX,
-            y: this.initialPos[i].y + offsetY,
+            x: this.initPos[i].x + offset.x,
+            y: this.initPos[i].y + offset.y,
           }
           // rotate
           targetPos.x = targetPos.x*Math.cos(optimalRotation) - targetPos.y*Math.sin(optimalRotation)
           targetPos.y = targetPos.x*Math.sin(optimalRotation) + targetPos.y*Math.cos(optimalRotation)
-          if (deployment == "dev") this.DEBUG.targetPos = targetPos
+          if (deployment == "dev") this.DEBUG_targetPos = targetPos
           // create a spring between the target position and current point
           computeSpring(this.pos[i], targetPos, 0.0001)
         }
