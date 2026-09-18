@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>Round soft body simulation</title>
+  <title>Soft body simulation</title>
   <style>
     canvas {
       aspect-ratio: 1/1;
@@ -22,16 +22,20 @@
     canvas.width = internalSize
     canvas.height = internalSize
     let ctx = canvas.getContext("2d")
-    function calculateAvgAngle(pos, center) {
-      let totalCos = 0
-      let totalSin = 0
-      for (let i = 0; i < pos.length; i++) {
-        let currAngle = Math.atan2(center.y - pos[i].y, center.x - pos[i].x)
-        if (isNaN(currAngle)) throw "atan2 is undefined"
-        totalCos += Math.cos(currAngle)
-        totalSin += Math.sin(currAngle)
+    function calculateAngle(pos1, pos2) {
+      let distY = pos2.y - pos1.y
+      let distX = pos2.x - pos1.x
+      return Math.atan2(distY, distX)
+    }
+    function calculateNormAngle(pos1, pos2) {
+      return calculateAngle(norm(pos1), norm(pos2))
+    }
+    function norm(pos) {
+      let dist = distance({x:0,y:0}, pos)
+      return {
+        x: pos.x/dist,
+        y: pos.y/dist,
       }
-      return Math.atan2(totalSin, totalCos)
     }
     function getCenter(pts) {
       let centerX = 0
@@ -43,26 +47,33 @@
       }
       return {x: centerX/pts.length, y: centerY/pts.length}
     }
-    function computeSpring(pos, target, stiffness) {
+    function computeSpringForce(pos, target, stiffness) {
       // F = -kx
       let displacementX = pos.x - target.x
       let displacementY = pos.y - target.y
       let forceX = -stiffness * displacementX
       let forceY = -stiffness * displacementY
-      pos.x += forceX
-      pos.y += forceY
-      return pos
+      return {x: forceX, y: forceY}
+    }
+    function rotate(pos, theta, center={x:0,y:0}) {
+      let cos = Math.cos(theta)
+      let sin = Math.sin(theta)
+      return {
+        x: (pos.x-center.x)*cos - (pos.y-center.y)*sin + center.x,
+        y: (pos.x-center.x)*sin + (pos.y-center.y)*cos + center.y,
+      }
     }
     class SoftBody {
       constructor(pos) {
-        this.initPos = pos
+        this.initPos = []
+        for (let p of pos) {
+          this.initPos.push({x: p.x, y: p.y})
+        }
         if (deployment == "dev") {
           this.initPos = pos.map(p => Object.freeze({ ...p}))
           Object.freeze(this.initPos)
         }
         this.initCenter = getCenter(pos)
-
-        this.initAvgAngle = calculateAvgAngle(pos,this.initCenter)
         
         this.pos = pos
         this.vel = []
@@ -81,25 +92,19 @@
         }
         let center = getCenter(this.pos)
 
-        let offset = {
-          x: center.x - this.initCenter.x,
-          y: center.y - this.initCenter.x,
+        let optimalRotation = 0
+        for (let i = 0; i < this.pos.length; i++) {
+          optimalRotation += calculateAngle(this.pos[i], center) - calculateAngle(this.initPos[i], this.initCenter)
         }
-        let avgAngle = calculateAvgAngle(this.pos, this.initCenter)
-        let optimalRotation = 0//this.initAvgAngle - avgAngle
+        optimalRotation /= this.pos.length
 
         for (let i = 0; i < this.pos.length; i++) {
-          // translate
-          let targetPos = {
-            x: this.initPos[i].x + offset.x,
-            y: this.initPos[i].y + offset.y,
-          }
-          // rotate
-          targetPos.x = targetPos.x*Math.cos(optimalRotation) - targetPos.y*Math.sin(optimalRotation)
-          targetPos.y = targetPos.x*Math.sin(optimalRotation) + targetPos.y*Math.cos(optimalRotation)
-          this.DEBUG_targetPos[i]= targetPos
+          let targetPos = rotate(this.initPos[i], optimalRotation, this.initCenter)
+          this.DEBUG_targetPos[i] = targetPos
           // create a spring between the target position and current point
-          this.pos[i] = computeSpring(this.pos[i], targetPos, 0.1)
+          let springForce = computeSpringForce(this.pos[i], targetPos, 0.1)
+          this.vel[i].x += springForce.x
+          this.vel[i].y += springForce.y
         }
       }
     }
@@ -156,8 +161,8 @@
         {x: 1000+150, y: 1000-150},
       ])
     ]
-    bodies[0].vel[0].x=5
-    bodies[0].vel[0].y=5
+    bodies[0].vel[0].x=-10
+    bodies[0].vel[0].y=10
     
     
     let lastDraw = 0
