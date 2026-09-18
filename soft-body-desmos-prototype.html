@@ -63,6 +63,12 @@
         y: (pos.x-center.x)*sin + (pos.y-center.y)*cos + center.y,
       }
     }
+    function clampMod(val, min, max) {
+      while (val < min) val += max-min
+      while (val > max) val -= max-min
+      return val
+    }
+    const halfPi = Math.PI/2
     class SoftBody {
       constructor(pos) {
         this.initPos = []
@@ -94,7 +100,9 @@
 
         let optimalRotation = 0
         for (let i = 0; i < this.pos.length; i++) {
-          optimalRotation += calculateAngle(this.pos[i], center) - calculateAngle(this.initPos[i], this.initCenter)
+          let diff = clampMod(calculateAngle(this.pos[i], center), -halfPi, halfPi) - clampMod(calculateAngle(this.initPos[i], this.initCenter),-halfPi, halfPi)
+          optimalRotation += Math.atan2(Math.sin(diff), Math.cos(diff))
+          // ??????????????????
         }
         optimalRotation /= this.pos.length
 
