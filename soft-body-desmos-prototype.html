@@ -22,17 +22,46 @@
     canvas.width = internalSize
     canvas.height = internalSize
     let ctx = canvas.getContext("2d")
+    function calculateAvgAngle(pos) {
+      let totalCos = 0
+      let totalSin = 0
+      for (let p of pos) {
+        let currAngle = Math.atan2(this.initCenterY - p.y, this.initCenterX - p.x)
+        totalCos += Math.cos(currAngle)
+        totalSin += Math.sin(currAngle)
+      }
+      return Math.atan2(totalSin, totalCos)
+    }
+    function getCenter(pos) {
+      let centerX = 0
+      let centerY = 0
+      
+      for (let p of pos) {
+        let centerX += p.x
+        let centerY += p.y
+      }
+      return {x: centerX/pos.length, y: centerY/pos.length}
+    }
+    function computeSpring(pt, targetX, targetY, stiffness) {
+      // F = -kx
+      let displacementX = pt.x - targetX
+      let displacementY = pt.y - targetY
+      let forceX = -stiffness * displacementX
+      let forceY = -stiffness * displacementY
+      pt.x += forceX
+      pt.y += forceY
+      return pt
+    }
     class SoftBody {
       constructor(pos) {
         this.initPos = pos
-        this.initCenterX = 0
-        this.initCenterY = 0
-        for (let p of pos) {
-          this.initCenterX += p.x
-          this.initCenterY += p.y
-        }
-        this.initCenterX /= pos.length
-        this.initCenterY /= pos.length
+        
+        let center = getCenter(pos)
+        this.initCenterX = center.x
+        this.initCenterY = center.y
+
+        this.initAvgAngle = calculateAvgAngle(pos)
+        
         if (deployment == "dev") this.initPos = Object.freeze(pos)
         this.pos = pos
         this.vel = []
@@ -42,22 +71,35 @@
       }
       update() {
         // 1. Update velocity
-        let centerX = 0
-        let centerY = 0
+        
         for (let i = 0; i < this.pos.length; i++) {
           this.pos.x[i] += this.vel.x[i]
           this.pos.y[i] += this.vel.y[i]
           this.vel.x[i] /= 1.01
           this.vel.y[i] /= 1.01
-          centerX += this.pos.x[i]
-          centerY += this.pos.y[i]
+        }
+        let center = getCenter(this.pos)
+
+        let offset = {
+          x: center.x - this.initCenterX,
+          y: center.y - this.initCenterY,
         }
 
-        centerX /= this.pos.length
-        centerY /= this.pos.length
+        let avgAngle = calculateAvgAngle(pos)
+        let optimalRotation = this.initAvgAngle - avgAngle
 
         for (let i = 0; i < this.pos.length; i++) {
-          let center_pos = {x: this.initialPos[i] - this.pos.x[i]}
+          // translate
+          let targetPos = {
+            x: this.initialPos[i].x + offsetX,
+            y: this.initialPos[i].y + offsetY,
+          }
+          // rotate
+          targetPos.x = targetPos.x*Math.cos(optimalRotation) - targetPos.y*Math.sin(optimalRotation)
+          targetPos.y = targetPos.x*Math.sin(optimalRotation) + targetPos.y*Math.cos(optimalRotation)
+          if (deployment == "dev") this.DEBUG.targetPos = targetPos
+          // create a spring between the target position and current point
+
         }
       }
       getCenter() {
