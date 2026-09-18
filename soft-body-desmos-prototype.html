@@ -32,25 +32,25 @@
       }
       return Math.atan2(totalSin, totalCos)
     }
-    function getCenter(pos) {
+    function getCenter(pts) {
       let centerX = 0
       let centerY = 0
       
-      for (let p of pos) {
-        let centerX += p.x
-        let centerY += p.y
+      for (let p of pts) {
+        centerX += p.x
+        centerY += p.y
       }
-      return {x: centerX/pos.length, y: centerY/pos.length}
+      return {x: centerX/pts.length, y: centerY/pts.length}
     }
-    function computeSpring(pt, targetX, targetY, stiffness) {
+    function computeSpring(pos, target, stiffness) {
       // F = -kx
-      let displacementX = pt.x - targetX
-      let displacementY = pt.y - targetY
+      let displacementX = pos.x - target.x
+      let displacementY = pos.y - target.x
       let forceX = -stiffness * displacementX
       let forceY = -stiffness * displacementY
-      pt.x += forceX
-      pt.y += forceY
-      return pt
+      pos.x += forceX
+      pos.y += forceY
+      return pos
     }
     class SoftBody {
       constructor(pos) {
@@ -65,7 +65,7 @@
         if (deployment == "dev") this.initPos = Object.freeze(pos)
         this.pos = pos
         this.vel = []
-        for (let pt of pts) {
+        for (let p of pos) {
           this.vel.push({x:0,y:0})
         }
       }
@@ -99,7 +99,7 @@
           targetPos.y = targetPos.x*Math.sin(optimalRotation) + targetPos.y*Math.cos(optimalRotation)
           if (deployment == "dev") this.DEBUG.targetPos = targetPos
           // create a spring between the target position and current point
-
+          computeSpring(this.pos[i], targetPos, 0.0001)
         }
       }
       getCenter() {
@@ -133,7 +133,12 @@
       
     }
     let bodies = [
-      new SoftBody(1000, 1000, 200, 1, 32)
+      new SoftBody([
+        {x: 1000-50, y: 1000-50},
+        {x: 1000-50, y: 1000+50},
+        {x: 1000+50, y: 1000+50},
+        {x: 1000+50, y: 1000-50},
+      ])
     ]
     
     bodies[0].pts[8].velX -= 100
