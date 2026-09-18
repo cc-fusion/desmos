@@ -25,8 +25,8 @@
     function calculateAvgAngle(pos, center) {
       let totalCos = 0
       let totalSin = 0
-      for (let p of pos) {
-        let currAngle = Math.atan2(center.y - p.y, center.x - p.x)
+      for (let i = 0; i < pos.length; i++) {
+        let currAngle = Math.atan2(center[i].y - pos[i].y, center[i].x - pos[i].x)
         totalCos += Math.cos(currAngle)
         totalSin += Math.sin(currAngle)
       }
@@ -71,7 +71,7 @@
       }
       update() {
         // 1. Update velocity
-        
+        debugger
         for (let i = 0; i < this.pos.length; i++) {
           this.pos[i].x += this.vel[i].x
           this.pos[i].y += this.vel[i].y
@@ -84,7 +84,6 @@
           x: center.x - this.initCenter.x,
           y: center.y - this.initCenter.x,
         }
-
         let avgAngle = calculateAvgAngle(this.pos, this.initPos)
         let optimalRotation = this.initAvgAngle - avgAngle
 
