@@ -124,24 +124,40 @@
     const GRAVITY = 0
     function update() {
       for (let body of bodies) {
-        
+        body.update()
       }
     }
     let debug = 1
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      
+      for (let body of bodies) {
+        ctx.strokeStyle = "#000"
+        ctx.fillStyle = "#f00"
+        ctx.lineWidth = 5
+
+        ctx.beginPath()
+        ctx.moveTo(body.pos[0].x, body.pos[0].y)
+        body.pos.forEach(p => ctx.lineTo(p.x, p.y))
+        ctx.lineTo(body.pos[0].x, body.pos[0].y)
+        ctx.stroke()
+
+        for (let i = 0; i < body.pos.length; i++) {
+          ctx.beginPath()
+          ctx.arc(body.pos[i].x, body.pos[i].y, 10, 0, 6.29)
+          ctx.fill()
+
+        }
+      }
     }
     let bodies = [
       new SoftBody([
-        {x: 1000-50, y: 1000-50},
-        {x: 1000-50, y: 1000+50},
-        {x: 1000+50, y: 1000+50},
-        {x: 1000+50, y: 1000-50},
+        {x: 1000-150, y: 1000-150},
+        {x: 1000-150, y: 1000+150},
+        {x: 1000+150, y: 1000+150},
+        {x: 1000+150, y: 1000-150},
       ])
     ]
     
-    bodies[0].pts[8].velX -= 100
     let lastDraw = 0
     let frameRate = 60
     function animate() {
