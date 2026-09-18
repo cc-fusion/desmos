@@ -55,7 +55,10 @@
     class SoftBody {
       constructor(pos) {
         this.initPos = pos
-        
+        if (deployment == "dev") {
+          this.initPos = pos.map(p => Object.freeze({ ...p}))
+          Object.freeze(this.initPos)
+        }
         this.initCenter = getCenter(pos)
 
         this.initAvgAngle = calculateAvgAngle(pos,this.initCenter)
@@ -142,7 +145,6 @@
           ctx.beginPath()
           ctx.arc(body.pos[i].x, body.pos[i].y, 10, 0, 6.29)
           ctx.fill()
-
         }
       }
     }
