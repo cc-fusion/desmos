@@ -17,136 +17,97 @@
 <body>
   <canvas id="canvas"></canvas>
   <script>
+    let deployment = "dev"
     let internalSize = 2000
-      canvas.width = internalSize
-      canvas.height = internalSize
-      let ctx = canvas.getContext("2d")
-      class SoftBody {
-        constructor(x, y, radius, mass, numPts) {
-          this.x = x
-          this.y = y
-          this.pts = []
-          this.velX = 0
-          this.velY = 0
-          this.mass = mass
-          this.radius = radius
-          this.angle = 0
-          this.angVel = 0
-          for (let i = 0; i < Math.PI*2; i += Math.PI*2 / numPts) {
-            this.pts.push({
-              x: x + radius * Math.cos(i),
-              y: y + radius * Math.sin(i),
-              velX: 0,
-              velY: 0,
-              mass: mass/numPts,
-              targetAngle: i,
-            })
-          }
+    canvas.width = internalSize
+    canvas.height = internalSize
+    let ctx = canvas.getContext("2d")
+    class SoftBody {
+      constructor(pos) {
+        this.initPos = pos
+        this.initCenterX = 0
+        this.initCenterY = 0
+        for (let p of pos) {
+          this.initCenterX += p.x
+          this.initCenterY += p.y
+        }
+        this.initCenterX /= pos.length
+        this.initCenterY /= pos.length
+        if (deployment == "dev") this.initPos = Object.freeze(pos)
+        this.pos = pos
+        this.vel = []
+        for (let pt of pts) {
+          this.vel.push({x:0,y:0})
         }
       }
-      function distance(x1, y1, x2, y2) {
-        if (typeof x1 == "object") {
-          return Math.sqrt((x1.x-y1.x)**2+(x1.y-y1.y)**2)
+      update() {
+        // 1. Update velocity
+        let centerX = 0
+        let centerY = 0
+        for (let i = 0; i < this.pos.length; i++) {
+          this.pos.x[i] += this.vel.x[i]
+          this.pos.y[i] += this.vel.y[i]
+          this.vel.x[i] /= 1.01
+          this.vel.y[i] /= 1.01
+          centerX += this.pos.x[i]
+          centerY += this.pos.y[i]
         }
-        return Math.sqrt((x1-x2)**2+(y1-y2)**2)
-      }
-      const GRAVITY = 0
-      function update() {
-        for (let body of bodies) {
-          for (let pt of body.pts) {
-            pt.x += pt.velX
-            pt.y += pt.velY
-            pt.velX /= 1.01
-            pt.velY /= 1.01
-            // F = -kx
 
-            let springConstant = 0.001
-            let currentAngle = body.angle + pt.targetAngle
-            let targetX = body.x + Math.cos(currentAngle) * body.radius
-            let targetY = body.y + Math.sin(currentAngle) * body.radius
-            let displacementX = targetX - pt.x
-            let displacementY = targetY - pt.y
-            let forceX = springConstant * displacementX
-            let forceY = springConstant * displacementY
+        centerX /= this.pos.length
+        centerY /= this.pos.length
 
-            // a = F/m
-            pt.velX += forceX/pt.mass
-            pt.velY += forceY/pt.mass
-            body.velX -= forceX/body.mass
-            body.velY -= forceY/body.mass
-            pt.velY += GRAVITY
-          }
-          body.x += body.velX
-          body.y += body.velY
-          body.angle += body.angVel
-          body.velY += GRAVITY
-          body.velX /= 1.01
-          body.velY /= 1.01
-          body.angVel /= 1.01
+        for (let i = 0; i < this.pos.length; i++) {
+          let center_pos = {x: this.initialPos[i] - this.pos.x[i]}
         }
       }
-      let debug = 1
-      function render() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
-        for (let body of bodies) {
-          ctx.fillStyle = "#f00"
-          ctx.lineWidth = 1
-          ctx.strokeStyle = "#000"
-          if (debug) {
-            let firstPt = true
-            for (let pt of body.pts) {
-              // line from center
-              if (firstPt) {
-                ctx.lineWidth = 10
-              } else {
-                ctx.lineWidth = 1
-              }
-              ctx.beginPath()
-              ctx.moveTo(body.x, body.y)
-              ctx.lineTo(pt.x, pt.y)
-              ctx.stroke()
-              firstPt = false
-              // actual endpoint dot
-              ctx.beginPath()
-              ctx.arc(pt.x, pt.y, 7.5, 0, 6.29)
-              ctx.fill()
-            }
-            // center dot
-            ctx.beginPath()
-            ctx.arc(body.x, body.y, 20, 0, 6.29)
-            ctx.fill()
-          } else {
-            // draw borders
-            ctx.beginPath()
-            ctx.moveTo(body.pts[0].x, body.pts[0].y)
-            for (let pt of body.pts) {
-              ctx.lineTo(pt.x, pt.y)
-            }
-            ctx.lineTo(body.pts[0].x, body.pts[0].y)
-            ctx.stroke()
-          }
+      getCenter() {
+        let avgX = 0
+        let avgY = 0
+        for (let pt of this.pos) {
+          avgX += pt
+          avgY += pt
+        }
+        return {
+          x: avgX / this.pts.length,
+          y: avgY / this.pts.length
         }
       }
-      let bodies = [
-        new SoftBody(1000, 1000, 200, 1, 32)
-      ]
-      bodies[0].pts[24].velX += 100
-      bodies[0].pts[8].velX -= 200
-      bodies[0].velX += 10
-    // TODO: need to implement angular velocity
-      let lastDraw = 0
-      let frameRate = 60
-      function animate() {
-        if (Date.now() - lastDraw < 1000/frameRate) {
-          requestAnimationFrame(animate)
-          return
-        }
-        update()
-        render()
-        lastDraw = Date.now()
+    }
+    function distance(x1, y1, x2, y2) {
+      if (typeof x1 == "object") {
+        return Math.sqrt((x1.x-y1.x)**2+(x1.y-y1.y)**2)
+      }
+      return Math.sqrt((x1-x2)**2+(y1-y2)**2)
+    }
+    const GRAVITY = 0
+    function update() {
+      for (let body of bodies) {
+        
+      }
+    }
+    let debug = 1
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      
+    }
+    let bodies = [
+      new SoftBody(1000, 1000, 200, 1, 32)
+    ]
+    
+    bodies[0].pts[8].velX -= 100
+    let lastDraw = 0
+    let frameRate = 60
+    function animate() {
+      if (Date.now() - lastDraw < 1000/frameRate) {
         requestAnimationFrame(animate)
+        return
       }
+      update()
+      render()
+      lastDraw = Date.now()
       requestAnimationFrame(animate)
+    }
+    requestAnimationFrame(animate)
   </script>
 </body>
 
