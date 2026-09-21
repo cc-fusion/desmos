@@ -1,0 +1,343 @@
+
+<!-- https://www.desmos.com/calculator/qaobsqytt9 -->
+<!DOCTYPE html>
+<html>
+  <head> 
+    <title>Navier Stokes Fluid Simulation</title>
+    <style>
+      body {
+        background-color: rgb(20,20,50);
+        color: white;
+        overflow: hidden;
+        margin: 0;
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+      }
+      .app {
+        display: flex;
+        width: calc(100vw - 60px);
+        height: calc(100vh - 60px);
+        align-items: stretch;
+        flex-direction: row;
+        margin: 30px;
+      }
+      .controls {
+        flex: 1;
+        display: flex;
+        width: 40%;
+        text-align: center;
+        flex-direction: column;
+        justify-content: center;
+        padding: 0 50px 0 100px;
+      }
+      .simulation {
+        flex: 3;
+        display: flex;
+        width: 60%;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .canvas-container {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      canvas {
+        width: min(100%, 60vh);
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        image-rendering: pixelated;
+        aspect-ratio: 1 / 1;
+      }
+      .simulation {
+        text-align: center;
+      }
+      #resetBtn {
+        color: white;
+        padding: 10px;
+        background-color: #ff0000;
+        margin: 20px;
+        border: 0;
+        font-size: 1.5em;
+        border-radius: 5px;
+      }
+      #resetBtn:hover {
+        background-color: #ee0000;
+      }
+      a {
+        color: #00BFFF;
+      }
+      /* *{outline: 1px solid white}/* */
+    </style>
+  </head>
+  <body>
+    <div class="app"> 
+      <div class="controls" id="controls">
+        <label for="s-control">Size</label>
+        <input type="range" id="s-control" value="128" min="10" max="256" step="1" data-setting="size" data-name="Size">
+        <br>
+        <label for="if-control">Interaction Force</label>
+        <input type="range" id="if-control" value="1" min="0" max="10" step="0.1" data-setting="interactionForce" data-name="Interaction Force">
+        <br>
+        <label for="id-control">Interaction Density</label>
+        <input type="range" id="id-control" value="3" min="0" max="10" step="0.1" data-setting="interactionDensity" data-name="Interaction Density">
+        <br>
+        <label for="is-control">Interaction Size</label>
+        <input type="range" id="is-control" value="2" min="0" max="10" step="0.1" data-setting="interactionSize" data-name="Interaction Size">
+        <br>
+        <label for="dt-control">Delta Time</label>
+        <input type="range" id="dt-control" value="0.5" min="0" max="2" step="0.01" data-setting="deltaTime" data-name="Delta Time">
+        <br>
+        <label for="df-control">Density Fade</label>
+        <input type="range" id="df-control" value="0.005" min="0" max="0.1" step="0.001" data-setting="densityFade" data-name="Density Fade">
+        <br>
+        <label for="vf-control">Velocity Fade</label>
+        <input type="range" id="vf-control" value="0.01" min="0" max="0.1" step="0.001" data-setting="velocityFade" data-name="Velocity Fade">
+        <br>
+        <label for="dr-control">Diffusion Rate</label>
+        <input type="range" id="dr-control" value="0.05" min="0" max="1" step="0.01" data-setting="diffusionRate" data-name="Diffusion Rate">
+        <br>
+        <label for="di-control">Diffusion Iterations</label>
+        <input type="range" id="di-control" value="20" min="0" max="100" step="1" data-setting="diffusionIterations" data-name="Diffusion Iterations">
+        <br>
+        <label for="pi-control">Pressure Iterations</label>
+        <input type="range" id="pi-control" value="20" min="0" max="100" step="1" data-setting="pressureIterations" data-name="Pressure Iterations">
+      </div>
+      <div class="simulation">
+        <h3>Navier Stokes Fluid Simulation<br><a href="https://www.desmos.com/calculator/qaobsqytt9">Desmos Implementation</a></h3>
+        <div class="canvas-container">
+          <canvas id="canvas"></canvas>
+        </div>
+        <div>
+          <button id="resetBtn">Reset</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      let hasAlerted = false
+      addEventListener("error", (e) => {
+        if (!hasAlerted) {
+          hasAlerted = true
+          alert(e.message + e.lineno)
+        }
+      })
+    </script>
+    <script>
+
+      let CONFIG = {}
+
+      let resetBtn = document.getElementById("resetBtn")
+      let controlsDiv = document.getElementById("controls")
+      let canvas = document.getElementById("canvas")
+      let ctx = canvas.getContext("2d")
+
+      let velX
+      let velY
+      let density
+      let pressure
+      let divergence
+      let prevVelX
+      let prevVelY
+      let prevDensity
+
+      function updateConfig() {
+        for (let element of controlsDiv.querySelectorAll("[data-setting]")) {
+          let dataSetting = element.getAttribute("data-setting")
+          let dataName = element.getAttribute("data-name")
+          let id = element.getAttribute("id")
+          CONFIG[dataSetting] = parseFloat(element.value)
+          controlsDiv.querySelector(`[for="${id}"]`).innerText = dataName + ": " + parseFloat(element.value)
+        }
+        CONFIG.size2 = CONFIG.size ** 2
+        if (canvas.width !== CONFIG.size) {
+          canvas.width = CONFIG.size
+          canvas.height = CONFIG.size
+          resetArrays()
+        }
+      }
+
+      function resetArrays() {
+        // apparently, Float32Array is much faster than normal arrays
+        velX = new Float32Array(CONFIG.size2).fill(0)
+        velY = new Float32Array(CONFIG.size2).fill(0)
+        density = new Float32Array(CONFIG.size2).fill(0)
+        pressure = new Float32Array(CONFIG.size2).fill(0)
+        divergence = new Float32Array(CONFIG.size2).fill(0)
+        prevVelX = new Float32Array(CONFIG.size2).fill(0)
+        prevVelY = new Float32Array(CONFIG.size2).fill(0)
+        prevDensity = new Float32Array(CONFIG.size2).fill(0)
+      }
+      function reset() {
+        updateConfig()
+        resetArrays()
+      }
+      function index(x,y) {
+        return (((x % CONFIG.size) + CONFIG.size) % CONFIG.size) + CONFIG.size * (((y % CONFIG.size) + CONFIG.size) % CONFIG.size)
+      }
+      function diffuse(currentField, prevField) {
+        for (let k = 0; k < CONFIG.diffusionIterations; k++) {
+          for (let i = 0; i < CONFIG.size; i++) {
+            for (let j = 0; j < CONFIG.size; j++) {
+              currentField[index(i,j)] = (currentField[index(i,j)] + CONFIG.deltaTime * CONFIG.diffusionRate * (
+                prevField[index(i-1,j)] + // left
+                prevField[index(i+1,j)] + // right
+                prevField[index(i,j-1)] + // down
+                prevField[index(i,j+1)]  // up
+              ) / 4) / (1 + CONFIG.deltaTime * CONFIG.diffusionRate) 
+            }
+          }
+        }
+      }
+      function lerp(a,b,k) {return a+k*(b-a)}
+      function advect(currentField, prevField, velX, velY) {
+        for (let i = 0; i < CONFIG.size; i++) {
+          for (let j = 0; j < CONFIG.size; j++) {
+            let x = i - CONFIG.deltaTime * velX[index(i,j)]
+            let y = j - CONFIG.deltaTime * velY[index(i,j)]
+
+            let xf = Math.floor(x)
+            let yf = Math.floor(y)
+
+            let l1 = lerp(prevField[index(xf,yf)], prevField[index(xf+1,yf)], x - xf)
+            let l2 = lerp(prevField[index(xf,yf+1)], prevField[index(xf+1,yf+1)], x - xf)
+            currentField[index(i,j)] = lerp(l1, l2, y - yf)
+          }
+        }
+      }
+      function project(velX, velY) {
+        for (let i = 0; i < CONFIG.size; i++) {
+          for (let j = 0; j < CONFIG.size; j++) {
+            divergence[index(i,j)] = -0.5 / CONFIG.size * (
+              velX[index(i+1,j)] - velX[index(i-1,j)] + // right - left + 
+              velY[index(i,j+1)] - velY[index(i,j-1)]    // up - down
+            )
+            pressure[index(i,j)] = 0 // additionally, reset pressure field
+          }
+        }
+        for (let k = 0; k < CONFIG.pressureIterations; k++) {
+          for (let i = 0; i < CONFIG.size; i++) {
+            for (let j = 0; j < CONFIG.size; j++) {
+              pressure[index(i,j)] = (divergence[index(i,j)] + 
+                                      pressure[index(i-1,j)] +     // left +
+                                      pressure[index(i+1,j)] +    // right +
+                                      pressure[index(i,j-1)] +     //down +
+                                      pressure[index(i,j+1)]) / 4 // up
+            }
+          }
+        }
+        for (let i = 0; i < CONFIG.size; i++) {
+          for (let j = 0; j < CONFIG.size; j++) {
+            velX[index(i,j)] -= 0.5 * CONFIG.size * (pressure[index(i+1,j)] - pressure[index(i-1,j)])
+            velY[index(i,j)] -= 0.5 * CONFIG.size * (pressure[index(i,j+1)] - pressure[index(i,j-1)])
+          }
+        }
+      }
+
+      // Source - https://stackoverflow.com/a
+      // Posted by Grumdrig, modified by community. See post 'Timeline' for change history
+      // Retrieved 2026-01-11, License - CC BY-SA 4.0
+
+      function sqr(x) { return x * x }
+      function dist2(v, w) { return sqr(v.x - w.x) + sqr(v.y - w.y) }
+      function distToSegmentSquared(p, v, w) {
+        var l2 = dist2(v, w);
+        if (l2 == 0) return dist2(p, v);
+        var t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return dist2(p, { x: v.x + t * (w.x - v.x),
+                         y: v.y + t * (w.y - v.y) });
+      }
+      function distToSegment(p, v, w) { return Math.sqrt(distToSegmentSquared(p, v, w)); }
+
+
+      let mouse = {x: 0, y: 0, prevX: 0, prevY: 0, down: false}
+      addEventListener("mousedown", (e) => {
+        let rect = canvas.getBoundingClientRect()
+        mouse.down = true
+        mouse.x = (e.clientX - rect.left) * canvas.width/rect.width
+        mouse.y = (e.clientY - rect.top) * canvas.height/rect.height
+      })
+      addEventListener("mousemove", (e) => {
+        let rect = canvas.getBoundingClientRect()
+        mouse.x = (e.clientX - rect.left) * canvas.width/rect.width
+        mouse.y = (e.clientY - rect.top) * canvas.height/rect.height
+      })
+      addEventListener("mouseup", (e) => {
+        mouse.down = false
+      })
+      resetBtn.addEventListener("click", (e) => {
+        reset()
+      })
+      controlsDiv.addEventListener("input", updateConfig)
+      function render() {
+        ctx.clearRect(0,0,canvas.width,canvas.height)
+        ctx.imageSmoothingEnabled = false
+        
+        for (let i = 0; i < CONFIG.size2; i++) {
+          prevVelX[i] = velX[i]
+          prevVelY[i] = velY[i]
+          prevDensity[i] = density[i]
+        }
+        
+        diffuse(velX, prevVelX)
+        diffuse(velY, prevVelY)
+        diffuse(density, prevDensity)
+        
+        for (let i = 0; i < CONFIG.size2; i++) {
+          prevVelX[i] = velX[i]
+          prevVelY[i] = velY[i]
+          prevDensity[i] = density[i]
+        }
+
+        advect(velX, prevVelX, prevVelX, prevVelY)
+        advect(velY, prevVelY, prevVelX, prevVelY)
+        advect(density, prevDensity, prevVelX, prevVelY)
+
+        project(velX, velY)
+
+        for (let i = 0; i < CONFIG.size2; i++) {
+          velX[i] /= 1+CONFIG.velocityFade
+          velY[i] /= 1+CONFIG.velocityFade
+          density[i] /= 1+CONFIG.densityFade
+        }
+
+
+        let imageData = ctx.createImageData(CONFIG.size, CONFIG.size)
+        let data = imageData.data
+        for (let i = 0; i < imageData.data.length/4; i ++) {
+          data[i*4] = density[i]*250
+          data[i*4+1] = density[i]*75
+          data[i*4+2] = density[i]*25
+          data[i*4+3] = 255
+        } 
+
+        ctx.putImageData(imageData,0,0)
+
+        let cellSize = canvas.width / CONFIG.size
+
+        if (mouse.down) {
+          for (let x = 0; x < CONFIG.size; x++) {
+            for (let y = 0; y < CONFIG.size; y++) {
+              let currentIndex = index(x,y)
+              let distance = distToSegment({x:x,y:y},{x:mouse.x/cellSize,y:mouse.y/cellSize},{x:mouse.prevX/cellSize,y:mouse.prevY/cellSize})
+              if (distance < CONFIG.interactionSize) {
+                velX[currentIndex] += CONFIG.interactionForce * (mouse.x - mouse.prevX)
+                velY[currentIndex] += CONFIG.interactionForce * (mouse.y - mouse.prevY)
+                density[currentIndex] += CONFIG.interactionDensity
+              }
+            }
+          }
+        }
+        mouse.prevX = mouse.x
+        mouse.prevY = mouse.y
+        
+        requestAnimationFrame(render)
+      }
+      reset()
+      render()
+    </script>
+</body>
+</html>
