@@ -67,6 +67,7 @@
       ]
     }
     function closestPointOnSegment(pt, pt1, pt2) {
+      // todo: convert to lin. alg
       // Find y=mx+b
       // calculate slope
       let m1 = (pt2.y - pt1.y)/(pt2.x - pt1.x)
@@ -81,7 +82,7 @@
       let x = (b2-b1)/(m1-m2)
       let y = m1*x+b1
 
-      return {x,y}
+      return new Vector2(x,y)
     }
     function clampMod(val, min, max) {
       while (val < min) val += max-min
@@ -95,27 +96,20 @@
     // Springs
     function computeSpringForce(pos, target, stiffness) {
       // F = -kx
-      let displacementX = pos.x - target.x
-      let displacementY = pos.y - target.y
-      let forceX = -stiffness * displacementX
-      let forceY = -stiffness * displacementY
-      return {x: forceX, y: forceY}
+      return pos.copy().subtract(target).multiplyScalar(-stiffness) // -4 lines with vectors!
     }
     function computeSpringDamping(vel, relativeVel, damping) {
-      return {
-        x: damping * (vel.x - relativeVel.x),
-        y: damping * (vel.y - relativeVel.y)
-      }
+      return vel.copy().subtract(relativeVel).multiplyScalar(damping)
     }
 
     // Trig
     function rotate(pos, theta, center={x:0,y:0}) {
       let cos = Math.cos(theta)
       let sin = Math.sin(theta)
-      return {
-        x: (pos.x-center.x)*cos - (pos.y-center.y)*sin + center.x,
-        y: (pos.x-center.x)*sin + (pos.y-center.y)*cos + center.y,
-      }
+      return new Vector2(
+        (pos.x-center.x)*cos - (pos.y-center.y)*sin + center.x,
+        (pos.x-center.x)*sin + (pos.y-center.y)*cos + center.y
+      )
     }
     function calculateAngle(pos1, pos2) {
       let distY = pos2.y - pos1.y
@@ -148,19 +142,21 @@
       return intersections % 2 == 1
     }
 
-    // Vector2 (TODO: switch everything to vectors for simplicity)
-
     class Vector2 {
       constructor(x, y) {this.x = x;this.y = y}
-      add(otherVec) {this.x += otherVec.x;this.y += otherVec.y}
-      subtract(otherVec) {this.x -= otherVec.x;this.y -= otherVec.y}
-      multiplyScalar(num) {this.x *= num;this.y *= num}
-      dot(other) {return this.x * other.x + this.y * other.y}
-      cross(other) {return this.x * other.y + this.y * other.x}
+      add(otherVec) {this.x += otherVec.x;this.y += otherVec.y;return this}
+      subtract(otherVec) {this.x -= otherVec.x;this.y -= otherVec.y;return this}
+      multiplyScalar(num) {this.x *= num;this.y *= num;return this}
+      dot(other) {return this.x * other.x + this.y * other.y;return this}
+      cross(other) {return this.x * other.y + this.y * other.x;return this}
       norm() {
-        let dist = Math.sqrt(this.x**2 + this.y**2)
-        if (dist == 0) throw "Cannot normalize 0 vector"
+        let dist = this.magnitude
+        if (dist == 0) throw "Cannot normalize zero vector."
         this.x /= dist;this.y /= dist
+        return this
+      }
+      get magnitude() {
+        return Math.sqrt(this.x**2 + this.y**2)
       }
       copy() {return new Vector2(this.x, this.y)}
     }
@@ -172,7 +168,7 @@
         SoftBody.ID++
         this.initPos = []
         for (let p of pos) {
-          this.initPos.push({x: p.x, y: p.y})
+          this.initPos.push(new Vector2(p.x, p.y))
         }
         if (deployment == "dev") {
           this.initPos = pos.map(p => Object.freeze({ ...p}))
@@ -184,39 +180,40 @@
         this.pos = pos
         this.vel = []
         for (let p of pos) {
-          this.vel.push(Vector2(velX,velY))
+          this.vel.push(new Vector2(velX,velY))
         }
         this.DEBUG_targetPos=[]
       }
       updateVelocity() {
         for (let i = 0; i < this.pos.length; i++) {
+          let pos = this.pos[i]
+          let vel = this.vel[i]
           this.vel[i].y += GRAVITY
-          let updatedX = this.pos[i].x + this.vel[i].x
-          let updatedY = this.pos[i].y + this.vel[i].y
-          if (updatedX < 0) {
-            this.pos[i].x = 0
-            this.vel[i].x *= -BOUNCINESS
-            this.vel[i].y /= WALLFRICTION
-          } else if (updatedX > canvas.width) {
-            this.pos[i].x = canvas.width
-            this.vel[i].x *= -BOUNCINESS
-            this.vel[i].y /= WALLFRICTION
+          let updated = pos.copy().add(vel)
+          if (updated.x < 0) {
+            pos.x = 0
+            vel.x *= -BOUNCINESS
+            vel.y /= WALLFRICTION
+          } else if (updated.x > canvas.width) {
+            pos.x = canvas.width
+            vel.x *= -BOUNCINESS
+            vel.y /= WALLFRICTION
           } else {
-            this.pos[i].x = updatedX
+            pos.x = updated.x
           }
-          if (updatedY < 0) {
-            this.pos[i].y = 0
-            this.vel[i].y *= -BOUNCINESS
-            this.vel[i].x /= WALLFRICTION
-          } else if (updatedY > canvas.height) {
-            this.pos[i].y = canvas.height
-            this.vel[i].y *= -BOUNCINESS
-            this.vel[i].x /= WALLFRICTION
+          if (updated.y < 0) {
+            pos.y = 0
+            vel.y *= -BOUNCINESS
+            vel.x /= WALLFRICTION
+          } else if (updated.y > canvas.height) {
+            pos.y = canvas.height
+            vel.y *= -BOUNCINESS
+            vel.x /= WALLFRICTION
           } else {
-            this.pos[i].y = updatedY
+            pos.y = updated.y
           }
           
-          this.vel[i].multiplyScalar(1/AIRFRICTION)
+          vel.multiplyScalar(1/AIRFRICTION)
         }
       }
       updateShape() {
@@ -237,16 +234,19 @@
         
         let optimalRotation = Math.atan2(a1, a2)
         // END magic thing that actually works and doesn't explode
-        let centerVel = center.subtract(this.prevCenter)
+
+        let centerVel = center.copy().subtract(this.prevCenter)
         for (let i = 0; i < this.pos.length; i++) {
-          let targetPos = rotate(this.initPos[i], optimalRotation, this.initCenter)
-          targetPos.add(center).subtract(this.initCenter) // TODO: isn't this just centerVel?
+          let pos = this.pos[i]
+          let vel = this.vel[i]
+          let initPos = this.initPos[i]
+          let targetPos = rotate(initPos, optimalRotation, this.initCenter).add(center).subtract(this.initCenter) // TODO: isn't this just centerVel?
 
           this.DEBUG_targetPos[i] = targetPos
           // create a spring between the target position and current point
-          let springForce = computeSpringForce(this.pos[i], targetPos, STIFFNESS)
-          let springDamping = computeSpringDamping(this.vel[i], centerVel, DAMPING)
-          this.vel[i].add(springForce).subtract(springDamping)
+          let springForce = computeSpringForce(pos, targetPos, STIFFNESS)
+          let springDamping = computeSpringDamping(vel, centerVel, DAMPING)
+          vel.add(springForce).subtract(springDamping)
         }
         this.prevCenter = center
       }
@@ -254,12 +254,14 @@
         for (let otherBody of bodies) {
           if (otherBody.UUID == this.UUID) continue
           for (let i = 0; i < this.pos.length; i++) {
-            if (ptInPolygon(this.pos[i], otherBody.pos)) {
-              let vertices = closestVertices(this.pos[i], otherBody.pos)
-              let closestPoint = closestPointOnSegment(this.pos[i], vertices[0], vertices[1])
+            let pos = this.pos[i]
+
+            if (ptInPolygon(pos, otherBody.pos)) {
+              let vertices = closestVertices(pos, otherBody.pos)
+              let closestPoint = closestPointOnSegment(pos, vertices[0], vertices[1])
               let distanceRatio = distance(vertices[0],closestPoint)/distance(vertices[0], vertices[1])
-              let penetrationDepth = distance(closestPoint, this.pos[i])
-              let pointToSegmentForceVec = this.pos.copy().subtract(closestPoint).norm().multiplyScalar(penetrationDepth)
+              let penetrationDepth = distance(closestPoint, pos)
+              let pointToSegmentForceVec = pos.copy().subtract(closestPoint).norm().multiplyScalar(penetrationDepth)
               this.pos[i].subtract(pointToSegmentForceVec)
               vertices[0].add(pointToSegmentForceVec.copy().multiplyScalar(distanceRatio))
               vertices[0].add(pointToSegmentForceVec.copy().multiplyScalar(1-distanceRatio))
