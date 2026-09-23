@@ -321,7 +321,10 @@
       let points = []
       for (let i = 0; i < numpts; i++) {
         let theta = i/numpts*Math.PI*2
-        points.push({x:x+Math.cos(theta)*radius,y:y+Math.sin(theta)*radius})
+        points.push(new Vector2(
+          x+Math.cos(theta)*radius,
+          y+Math.sin(theta)*radius
+        ))
       }
       return points
     }
