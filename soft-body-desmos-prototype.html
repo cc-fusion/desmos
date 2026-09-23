@@ -1,192 +1,233 @@
-<!doctype html>
-<html>
+  <!doctype html>
+  <html>
 
-<head>
-  <title>Soft body simulation</title>
-  <style>
-    canvas {
-      aspect-ratio: 1/1;
-      max-width: 100%;
-      max-height: 100%;
-      width: 100%;
-      background-color: #ffffff;
-    }
-  </style>
-</head>
+  <head>
+    <title>Soft body simulation</title>
+    <style>
+      canvas {
+        aspect-ratio: 1/1;
+        max-width: 100%;
+        max-height: 100%;
+        width: 100%;
+        background-color: #ffffff;
+      }
+    </style>
+  </head>
 
-<body>
-  <canvas id="canvas"></canvas>
-  <script>
-    let deployment = "dev"
-    let internalSize = 2000
-    canvas.width = internalSize
-    canvas.height = internalSize
-    let ctx = canvas.getContext("2d")
-    function calculateAngle(pos1, pos2) {
-      let distY = pos2.y - pos1.y
-      let distX = pos2.x - pos1.x
-      return Math.atan2(distY, distX)
-    }
-    function calculateNormAngle(pos1, pos2) {
-      return calculateAngle(norm(pos1), norm(pos2))
-    }
-    function norm(pos) {
-      let dist = distance({x:0,y:0}, pos)
-      return {
-        x: pos.x/dist,
-        y: pos.y/dist,
+  <body>
+    <canvas id="canvas"></canvas>
+    <script>
+      let deployment = "dev"
+      let internalSize = 2000
+      canvas.width = internalSize
+      canvas.height = internalSize
+      let ctx = canvas.getContext("2d")
+      function calculateAngle(pos1, pos2) {
+        let distY = pos2.y - pos1.y
+        let distX = pos2.x - pos1.x
+        return Math.atan2(distY, distX)
       }
-    }
-    function getCenter(pts) {
-      let centerX = 0
-      let centerY = 0
-      
-      for (let p of pts) {
-        centerX += p.x
-        centerY += p.y
+      function calculateNormAngle(pos1, pos2) {
+        return calculateAngle(norm(pos1), norm(pos2))
       }
-      return {x: centerX/pts.length, y: centerY/pts.length}
-    }
-    function computeSpringForce(pos, target, stiffness) {
-      // F = -kx
-      let displacementX = pos.x - target.x
-      let displacementY = pos.y - target.y
-      let forceX = -stiffness * displacementX
-      let forceY = -stiffness * displacementY
-      return {x: forceX, y: forceY}
-    }
-    function rotate(pos, theta, center={x:0,y:0}) {
-      let cos = Math.cos(theta)
-      let sin = Math.sin(theta)
-      return {
-        x: (pos.x-center.x)*cos - (pos.y-center.y)*sin + center.x,
-        y: (pos.x-center.x)*sin + (pos.y-center.y)*cos + center.y,
-      }
-    }
-    function clampMod(val, min, max) {
-      while (val < min) val += max-min
-      while (val > max) val -= max-min
-      return val
-    }
-    const halfPi = Math.PI/2
-    class SoftBody {
-      constructor(pos) {
-        this.initPos = []
-        for (let p of pos) {
-          this.initPos.push({x: p.x, y: p.y})
+      function norm(pos) {
+        let dist = distance({x:0,y:0}, pos)
+        return {
+          x: pos.x/dist,
+          y: pos.y/dist,
         }
-        if (deployment == "dev") {
-          this.initPos = pos.map(p => Object.freeze({ ...p}))
-          Object.freeze(this.initPos)
-        }
-        this.initCenter = getCenter(pos)
+      }
+      function getCenter(pts) {
+        let centerX = 0
+        let centerY = 0
         
-        this.pos = pos
-        this.vel = []
-        for (let p of pos) {
-          this.vel.push({x:0,y:0})
+        for (let p of pts) {
+          centerX += p.x
+          centerY += p.y
         }
-        this.DEBUG_targetPos=[]
+        return {x: centerX/pts.length, y: centerY/pts.length}
       }
-      update() {
-        // 1. Update velocity
-        for (let i = 0; i < this.pos.length; i++) {
-          this.pos[i].x += this.vel[i].x
-          this.pos[i].y += this.vel[i].y
-          this.vel[i].x /= 1.01
-          this.vel[i].y /= 1.01
-        }
-        let center = getCenter(this.pos)
-
-        let optimalRotation = 0
-        for (let i = 0; i < this.pos.length; i++) {
-          let diff = clampMod(calculateAngle(this.pos[i], center), -halfPi, halfPi) - clampMod(calculateAngle(this.initPos[i], this.initCenter),-halfPi, halfPi)
-          optimalRotation += Math.atan2(Math.sin(diff), Math.cos(diff))
-          // ??????????????????
-        }
-        optimalRotation /= this.pos.length
-
-        for (let i = 0; i < this.pos.length; i++) {
-          let targetPos = rotate(this.initPos[i], optimalRotation, this.initCenter)
-          this.DEBUG_targetPos[i] = targetPos
-          // create a spring between the target position and current point
-          let springForce = computeSpringForce(this.pos[i], targetPos, 0.1)
-          this.vel[i].x += springForce.x
-          this.vel[i].y += springForce.y
+      function computeSpringForce(pos, target, stiffness) {
+        // F = -kx
+        let displacementX = pos.x - target.x
+        let displacementY = pos.y - target.y
+        let forceX = -stiffness * displacementX
+        let forceY = -stiffness * displacementY
+        return {x: forceX, y: forceY}
+      }
+      function rotate(pos, theta, center={x:0,y:0}) {
+        let cos = Math.cos(theta)
+        let sin = Math.sin(theta)
+        return {
+          x: (pos.x-center.x)*cos - (pos.y-center.y)*sin + center.x,
+          y: (pos.x-center.x)*sin + (pos.y-center.y)*cos + center.y,
         }
       }
-    }
-    function distance(x1, y1, x2, y2) {
-      if (typeof x1 == "object") {
-        return Math.sqrt((x1.x-y1.x)**2+(x1.y-y1.y)**2)
+      function clampMod(val, min, max) {
+        while (val < min) val += max-min
+        while (val > max) val -= max-min
+        return val
       }
-      return Math.sqrt((x1-x2)**2+(y1-y2)**2)
-    }
-    const GRAVITY = 0
-    function update() {
-      for (let body of bodies) {
-        body.update()
+      function clamp(val, min, max) {
+        return Math.min(Math.max(min, val), max)
       }
-    }
-    let debug = 1
-    function render() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      for (let body of bodies) {
-        ctx.strokeStyle = "#000"
-        ctx.fillStyle = "#f00"
-        ctx.lineWidth = 5
+      const BOUNCINESS = 0
+      const GRAVITY = 1
+      const halfPi = Math.PI/2
+      class SoftBody {
+        constructor(pos) {
+          this.initPos = []
+          for (let p of pos) {
+            this.initPos.push({x: p.x, y: p.y})
+          }
+          if (deployment == "dev") {
+            this.initPos = pos.map(p => Object.freeze({ ...p}))
+            Object.freeze(this.initPos)
+          }
+          this.initCenter = getCenter(pos)
+          
+          this.pos = pos
+          this.vel = []
+          for (let p of pos) {
+            this.vel.push({x:0,y:0})
+          }
+          this.DEBUG_targetPos=[]
+        }
+        update() {
+          // 1. Update velocity
+          for (let i = 0; i < this.pos.length; i++) {
+            let updatedX = this.pos[i].x + this.vel[i].x
+            let updatedY = this.pos[i].y + this.vel[i].y
+            if (updatedX < 0) {
+              this.pos[i].x = 0
+              this.vel[i].x *= -BOUNCINESS
+            } else if (updatedX > canvas.width) {
+              this.pos[i].x = canvas.width
+              this.vel[i].x *= -BOUNCINESS
+            } else {
+              this.pos[i].x = updatedX
+            }
+            if (updatedY < 0) {
+              this.pos[i].y = 0
+              this.vel[i].y *= -BOUNCINESS
+            } else if (updatedY > canvas.height) {
+              this.pos[i].y = canvas.height
+              this.vel[i].y *= -BOUNCINESS
+            } else {
+              this.pos[i].y = updatedY
+            }
+            
+            this.vel[i].x /= 1.1
+            this.vel[i].y /= 1.1
+            this.vel[i].y += GRAVITY
+          }
+          let center = getCenter(this.pos)
 
-        ctx.beginPath()
-        ctx.moveTo(body.pos[0].x, body.pos[0].y)
-        body.pos.forEach(p => ctx.lineTo(p.x, p.y))
-        ctx.lineTo(body.pos[0].x, body.pos[0].y)
-        ctx.stroke()
+          // START magic thing that actually works and doesn't explode
+          let a1 = 0
+          let a2 = 0
+          for (let i = 0; i < this.pos.length; i++) {
+            let px = this.pos[i].x - center.x
+            let py = this.pos[i].y - center.y
+            let qx = this.initPos[i].x - this.initCenter.x
+            let qy = this.initPos[i].y - this.initCenter.y
 
-        for (let i = 0; i < body.pos.length; i++) {
+            a1 += py * qx - px * qy
+            a2 += px * qx + py * qy
+          }
+          
+          let optimalRotation = Math.atan2(a1, a2)
+          // END magic thing that actually works and doesn't explode
+
+          for (let i = 0; i < this.pos.length; i++) {
+            let targetPos = rotate(this.initPos[i], optimalRotation, this.initCenter)
+            targetPos.x += center.x - this.initCenter.x
+            targetPos.y += center.y - this.initCenter.y
+            targetPos.x = clamp(targetPos.x, 0, canvas.width)
+            targetPos.y = clamp(targetPos.y, 0, canvas.height)
+            this.DEBUG_targetPos[i] = targetPos
+            // create a spring between the target position and current point
+            let springForce = computeSpringForce(this.pos[i], targetPos, 0.1)
+            this.vel[i].x += springForce.x
+            this.vel[i].y += springForce.y
+          }
+        }
+      }
+      function distance(x1, y1, x2, y2) {
+        if (typeof x1 == "object") {
+          return Math.sqrt((x1.x-y1.x)**2+(x1.y-y1.y)**2)
+        }
+        return Math.sqrt((x1-x2)**2+(y1-y2)**2)
+      }
+      function update() {
+        for (let body of bodies) {
+          body.update()
+        }
+      }
+      let debug = 1
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        for (let body of bodies) {
+          ctx.strokeStyle = "#000"
           ctx.fillStyle = "#f00"
-          ctx.beginPath()
-          ctx.arc(body.pos[i].x, body.pos[i].y, 10, 0, 6.29)
-          ctx.fill()
+          ctx.lineWidth = 5
 
-          ctx.fillStyle = "#00f"
-          ctx.lineWidth=3
-          ctx.strokeStyle = "#00f"
           ctx.beginPath()
-          ctx.moveTo(body.DEBUG_targetPos[i].x, body.DEBUG_targetPos[i].y)
-          ctx.lineTo(body.pos[i].x, body.pos[i].y)
+          ctx.moveTo(body.pos[0].x, body.pos[0].y)
+          body.pos.forEach(p => ctx.lineTo(p.x, p.y))
+          ctx.lineTo(body.pos[0].x, body.pos[0].y)
           ctx.stroke()
-          ctx.beginPath()
-          ctx.arc(body.DEBUG_targetPos[i].x, body.DEBUG_targetPos[i].y, 10, 0, 6.29)
-          ctx.fill()
+
+          for (let i = 0; i < body.pos.length; i++) {
+            // spring from target pos to actual pos
+            ctx.strokeStyle = "#99f"
+            ctx.lineWidth=3
+            ctx.beginPath()
+            ctx.moveTo(body.DEBUG_targetPos[i].x, body.DEBUG_targetPos[i].y)
+            ctx.lineTo(body.pos[i].x, body.pos[i].y)
+            ctx.stroke()
+
+            // debug pts
+            ctx.fillStyle = "#99f"
+            ctx.beginPath()
+            ctx.arc(body.DEBUG_targetPos[i].x, body.DEBUG_targetPos[i].y, 10, 0, 6.29)
+            ctx.fill()
+
+            // actual pts
+            ctx.fillStyle = "#f00"
+            ctx.beginPath()
+            ctx.arc(body.pos[i].x, body.pos[i].y, 10, 0, 6.29)
+            ctx.fill()
+          }
         }
       }
-    }
-    let bodies = [
-      new SoftBody([
-        {x: 1000-150, y: 1000-150},
-        {x: 1000-150, y: 1000+150},
-        {x: 1000+150, y: 1000+150},
-        {x: 1000+150, y: 1000-150},
-      ])
-    ]
-    bodies[0].vel[0].x=-10
-    bodies[0].vel[0].y=10
-    
-    
-    let lastDraw = 0
-    let frameRate = 60
-    function animate() {
-      if (Date.now() - lastDraw < 1000/frameRate) {
-        requestAnimationFrame(animate)
-        return
+      function circle(x,y, radius, numpts) {
+        let points = []
+        for (let i = 0; i < numpts; i++) {
+          let theta = i/numpts*Math.PI*2
+          points.push({x:x+Math.cos(theta)*radius,y:y+Math.sin(theta)*radius})
+        }
+        return points
       }
-      update()
-      render()
-      lastDraw = Date.now()
+      let bodies = [
+        new SoftBody(circle(1000,1000,400,11))
+      ]
+      
+      
+      let lastDraw = 0
+      let frameRate = 60
+      function animate() {
+        if (Date.now() - lastDraw < 1000/frameRate) {
+          requestAnimationFrame(animate)
+          return
+        }
+        update()
+        render()
+        lastDraw = Date.now()
+        requestAnimationFrame(animate)
+      }
       requestAnimationFrame(animate)
-    }
-    requestAnimationFrame(animate)
-  </script>
-</body>
+    </script>
+  </body>
 
-</html>
+  </html>
