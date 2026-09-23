@@ -22,6 +22,17 @@
     canvas.width = internalSize
     canvas.height = internalSize
     let ctx = canvas.getContext("2d")
+
+    // Constants
+
+    const BOUNCINESS = 1
+    const GRAVITY = 0.05
+    const STIFFNESS = 1
+    const WALLFRICTION = 10
+    const AIRFRICTION = 1
+    const DAMPING = 0.1
+    const halfPi = Math.PI/2
+
     // Helpers
     function norm(pos) {
       let dist = distance({x:0,y:0}, pos)
@@ -60,19 +71,36 @@
         }
       }
       return [
-        polygon[i],
-        polygon[(i+1)%polygon.length]
+        polygon[minIdx],
+        polygon[(minIdx+1)%polygon.length]
       ]
     }
     function closestPointOnSegment(pt, pt1, pt2) {
-      // Find y=mx+b (need to find the point on this segment)
+      // Find y=mx+b
       // calculate slope
-      let m = (pt2.y - pt1.y)/(pt2.x - pt1.x)
-      let b = pt1.y - m * pt1.x
-      // perpendicular slope must be m'=-1/m
-      let mPerp = -1/m
+      let m1 = (pt2.y - pt1.y)/(pt2.x - pt1.x)
+      let b1 = pt1.y - m1 * pt1.x
 
+      // Find the y=mx+b for the perpendicular segment, then find the intersection
+      // perpendicular slope must be m'=-1/m
+      let m2 = -1/m1
+      let b2 = pt.y - m2 * pt.x
+      
+      // Find point of intersection
+      let y = (b2-b1)/(m1-m2)
+      let x = m1*y+b1
+
+      return {x,y}
     }
+    function clampMod(val, min, max) {
+      while (val < min) val += max-min
+      while (val > max) val -= max-min
+      return val
+    }
+    function clamp(val, min, max) {
+      return Math.min(Math.max(min, val), max)
+    }
+
     // Springs
     function computeSpringForce(pos, target, stiffness) {
       // F = -kx
@@ -88,6 +116,7 @@
         y: damping * (vel.y - relativeVel.y)
       }
     }
+
     // Trig
     function rotate(pos, theta, center={x:0,y:0}) {
       let cos = Math.cos(theta)
@@ -105,15 +134,7 @@
     function calculateNormAngle(pos1, pos2) {
       return calculateAngle(norm(pos1), norm(pos2))
     }
-    // Clamp
-    function clampMod(val, min, max) {
-      while (val < min) val += max-min
-      while (val > max) val -= max-min
-      return val
-    }
-    function clamp(val, min, max) {
-      return Math.min(Math.max(min, val), max)
-    }
+
     // Raycasting + point-in-polygon
     function raycastHoriz0(x1, y1, x2, y2) {
       // check if line segment (x1, y1, x2, y2) intersects y=0 for x>=0
@@ -135,13 +156,7 @@
       }
       return intersections % 2 == 1
     }
-    const BOUNCINESS = 1
-    const GRAVITY = 0.05
-    const STIFFNESS = 1
-    const WALLFRICTION = 10
-    const AIRFRICTION = 1
-    const DAMPING = 0.1
-    const halfPi = Math.PI/2
+
     class SoftBody {
       static ID = 1
       constructor(pos, velX=0, velY=0) {
@@ -237,9 +252,10 @@
       updateIntersection() {
         for (let body of bodies) {
           if (body.UUID == this.UUID) continue
-          for (let i = 0; i < body.length; i++) {
+          for (let i = 0; i < body.pos.length; i++) {
             if (ptInPolygon(body.pos[i], bodies[0].pos)) {
-              let vertices = closestVertices(body.pos[i], body)
+              let vertices = closestVertices(body.pos[i], this.pos)
+              closestPointOnSegment(body.pos[i], vertices[0], vertices[1])
             }
           }
         }
