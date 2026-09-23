@@ -34,13 +34,6 @@
     const halfPi = Math.PI/2
 
     // Helpers
-    function norm(pos) {
-      let dist = distance({x:0,y:0}, pos)
-      return {
-        x: pos.x/dist,
-        y: pos.y/dist,
-      }
-    }
     function getCenter(pts) {
       let centerX = 0
       let centerY = 0
@@ -160,28 +153,18 @@
     // Vector2 (TODO: switch everything to vectors for simplicity)
 
     class Vector2 {
-      constructor(x, y) {
-        this.x = x
-        this.y = y
+      constructor(x, y) {this.x = x;this.y = y}
+      add(otherVec) {this.x += otherVec.x;this.y += otherVec.y}
+      subtract(otherVec) {this.x -= otherVec.x;this.y -= otherVec.y}
+      multiplyScalar(num) {this.x *= num;this.y *= num}
+      dot(other) {return this.x * other.x + this.y * other.y}
+      cross(other) {return this.x * other.y + this.y * other.x}
+      norm() {
+        let dist = Math.sqrt(this.x**2 + this.y**2)
+        if (dist == 0) throw "Cannot normalize 0 vector"
+        this.x /= dist;this.y /= dist
       }
-      add(otherVec) {
-        this.x += otherVec.x
-        this.y += otherVec.y
-      }
-      subtract(otherVec) {
-        this.x -= otherVec.x
-        this.y -= otherVec.y
-      }
-      multiplyScalar(num) {
-        this.x *= num
-        this.y *= num
-      }
-      dot(other) {
-        return this.x * other.x + this.y * other.y
-      }
-      cross(other) {
-        return this.x * other.y + this.y * other.x
-      }
+      copy() {return new Vector2(this.x, this.y)}
     }
 
     class SoftBody {
@@ -203,7 +186,7 @@
         this.pos = pos
         this.vel = []
         for (let p of pos) {
-          this.vel.push({x:velX,y:velY})
+          this.vel.push(Vector2(velX,velY))
         }
         this.DEBUG_targetPos=[]
       }
@@ -235,8 +218,7 @@
             this.pos[i].y = updatedY
           }
           
-          this.vel[i].x /= AIRFRICTION
-          this.vel[i].y /= AIRFRICTION
+          this.vel[i].multiplyScalar(1/AIRFRICTION)
         }
       }
       updateShape() {
@@ -252,27 +234,21 @@
           let qy = this.initPos[i].y - this.initCenter.y
 
           a1 += py * qx - px * qy
-          a2 += px * qx + py * qy
+          a2 += px * qx + py * qy // hey, this looks like one of the vector multiplication things! (TODO: change to vector)
         }
         
         let optimalRotation = Math.atan2(a1, a2)
         // END magic thing that actually works and doesn't explode
-        let centerVel = {
-          x: center.x - this.prevCenter.x,
-          y: center.y - this.prevCenter.y
-        }
+        let centerVel = center.subtract(this.prevCenter)
         for (let i = 0; i < this.pos.length; i++) {
           let targetPos = rotate(this.initPos[i], optimalRotation, this.initCenter)
-          targetPos.x += center.x - this.initCenter.x
-          targetPos.y += center.y - this.initCenter.y
-          //targetPos.x = clamp(targetPos.x, 0, canvas.width)
-          //targetPos.y = clamp(targetPos.y, 0, canvas.height)
+          targetPos.add(center).subtract(this.initCenter) // TODO: isn't this just centerVel?
+
           this.DEBUG_targetPos[i] = targetPos
           // create a spring between the target position and current point
           let springForce = computeSpringForce(this.pos[i], targetPos, STIFFNESS)
           let springDamping = computeSpringDamping(this.vel[i], centerVel, DAMPING)
-          this.vel[i].x += springForce.x - springDamping.x
-          this.vel[i].y += springForce.y - springDamping.y
+          this.vel[i].add(springForce).subtract(springDamping)
         }
         this.prevCenter = center
       }
