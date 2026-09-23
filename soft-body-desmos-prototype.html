@@ -55,6 +55,12 @@
         let forceY = -stiffness * displacementY
         return {x: forceX, y: forceY}
       }
+      function computeSpringDamping(vel, relativeVel, damping) {
+        return {
+          x: damping * (vel.x - relativeVel.x),
+          y: damping * (vel.y - relativeVel.y)
+        }
+      }
       function rotate(pos, theta, center={x:0,y:0}) {
         let cos = Math.cos(theta)
         let sin = Math.sin(theta)
@@ -75,6 +81,8 @@
       const GRAVITY = 10
       const STIFFNESS = 1
       const WALLFRICTION = 1.5
+      const AIRFRICTION = 1
+      const DAMPING = 2
       const halfPi = Math.PI/2
       class SoftBody {
         constructor(pos) {
@@ -87,6 +95,7 @@
             Object.freeze(this.initPos)
           }
           this.initCenter = getCenter(pos)
+          this.prevCenter = this.initCenter
           
           this.pos = pos
           this.vel = []
@@ -123,8 +132,8 @@
               this.pos[i].y = updatedY
             }
             
-            this.vel[i].x /= 1.01
-            this.vel[i].y /= 1.01
+            this.vel[i].x /= AIRFRICTION
+            this.vel[i].y /= AIRFRICTION
             this.vel[i].y += GRAVITY
           }
           let center = getCenter(this.pos)
@@ -154,9 +163,11 @@
             this.DEBUG_targetPos[i] = targetPos
             // create a spring between the target position and current point
             let springForce = computeSpringForce(this.pos[i], targetPos, STIFFNESS)
-            this.vel[i].x += springForce.x
-            this.vel[i].y += springForce.y
+            let springDamping = computeSpringDamping(center - this.prevCenter, this.vel[i], DAMPING)
+            this.vel[i].x += springForce.x + springDamping.x
+            this.vel[i].y += springForce.y + springDamping.y
           }
+          this.prevCenter = center
         }
       }
       function distance(x1, y1, x2, y2) {
