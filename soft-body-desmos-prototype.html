@@ -261,16 +261,10 @@
               let closestPoint = closestPointOnSegment(this.pos[i], vertices[0], vertices[1])
               let distanceRatio = distance(vertices[0],closestPoint)/distance(vertices[0], vertices[1])
               let penetrationDepth = distance(closestPoint, this.pos[i])
-              let pointToSegmentForceVec = norm({
-                x: (this.pos[i].x - closestPoint.x),
-                y: (this.pos[i].y - closestPoint.y)
-              })
-              this.pos[i].x -= pointToSegmentForceVec.x * penetrationDepth
-              this.pos[i].y -= pointToSegmentForceVec.y * penetrationDepth
-              vertices[0].x += pointToSegmentForceVec.x * penetrationDepth * distanceRatio
-              vertices[0].y += pointToSegmentForceVec.y * penetrationDepth * distanceRatio
-              vertices[1].x += pointToSegmentForceVec.x * penetrationDepth * (1-distanceRatio)
-              vertices[1].y += pointToSegmentForceVec.y * penetrationDepth * (1-distanceRatio)
+              let pointToSegmentForceVec = this.pos.copy().subtract(closestPoint).norm().multiplyScalar(penetrationDepth)
+              this.pos[i].subtract(pointToSegmentForceVec)
+              vertices[0].add(pointToSegmentForceVec.copy().multiplyScalar(distanceRatio))
+              vertices[0].add(pointToSegmentForceVec.copy().multiplyScalar(1-distanceRatio))
             }
           }
         }
