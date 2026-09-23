@@ -35,14 +35,12 @@
 
     // Helpers
     function getCenter(pts) {
-      let centerX = 0
-      let centerY = 0
+      let center = new Vector2(0,0)
       
       for (let p of pts) {
-        centerX += p.x
-        centerY += p.y
+        center.add(p)
       }
-      return {x: centerX/pts.length, y: centerY/pts.length}
+      return center.multiplyScalar(1/pts.length)
     }
     function distance(a, b, c, d) {
       if (typeof a == "object") {
