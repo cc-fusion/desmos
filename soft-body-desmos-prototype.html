@@ -64,6 +64,15 @@
         polygon[(i+1)%polygon.length]
       ]
     }
+    function closestPointOnSegment(pt, pt1, pt2) {
+      // Find y=mx+b (need to find the point on this segment)
+      // calculate slope
+      let m = (pt2.y - pt1.y)/(pt2.x - pt1.x)
+      let b = pt1.y - m * pt1.x
+      // perpendicular slope must be m'=-1/m
+      let mPerp = -1/m
+
+    }
     // Springs
     function computeSpringForce(pos, target, stiffness) {
       // F = -kx
@@ -230,7 +239,7 @@
           if (body.UUID == this.UUID) continue
           for (let i = 0; i < body.length; i++) {
             if (ptInPolygon(body.pos[i], bodies[0].pos)) {
-              let vertices = closestVertices(this., body)
+              let vertices = closestVertices(body.pos[i], body)
             }
           }
         }
@@ -240,12 +249,6 @@
         this.updateShape()
         this.updateIntersection()
       }
-    }
-    function distance(x1, y1, x2, y2) {
-      if (typeof x1 == "object") {
-        return Math.sqrt((x1.x-y1.x)**2+(x1.y-y1.y)**2)
-      }
-      return Math.sqrt((x1-x2)**2+(y1-y2)**2)
     }
     function update() {
       for (let body of bodies) {
