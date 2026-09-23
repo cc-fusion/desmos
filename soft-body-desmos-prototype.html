@@ -1,23 +1,23 @@
-  <!doctype html>
-  <html>
+<!doctype html>
+<html>
 
-  <head>
-    <title>Soft body simulation</title>
-    <style>
-      canvas {
-        aspect-ratio: 1/1;
-        max-width: 100%;
-        max-height: 100%;
-        width: 100%;
-        background-color: #ffffff;
-      }
-    </style>
-  </head>
+<head>
+  <title>Soft body simulation</title>
+  <style>
+    canvas {
+      aspect-ratio: 1/1;
+      max-width: 100%;
+      max-height: 100%;
+      width: 100%;
+      background-color: #ffffff;
+    }
+  </style>
+</head>
 
-  <body>
-    <canvas id="canvas"></canvas>
-    <script>
-      let deployment = "dev"
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    let deployment = "dev"
       let internalSize = 2000
       canvas.width = internalSize
       canvas.height = internalSize
@@ -77,15 +77,15 @@
       function clamp(val, min, max) {
         return Math.min(Math.max(min, val), max)
       }
-      const BOUNCINESS = 0
-      const GRAVITY = 10
+      const BOUNCINESS = 1
+      const GRAVITY = 1
       const STIFFNESS = 1
-      const WALLFRICTION = 1.5
+      const WALLFRICTION = 5
       const AIRFRICTION = 1
-      const DAMPING = 2
+      const DAMPING = 0.5
       const halfPi = Math.PI/2
       class SoftBody {
-        constructor(pos) {
+        constructor(pos, velX=0, velY=0) {
           this.initPos = []
           for (let p of pos) {
             this.initPos.push({x: p.x, y: p.y})
@@ -100,13 +100,14 @@
           this.pos = pos
           this.vel = []
           for (let p of pos) {
-            this.vel.push({x:100,y:0})
+            this.vel.push({x:velX,y:velY})
           }
           this.DEBUG_targetPos=[]
         }
         update() {
           // 1. Update velocity
           for (let i = 0; i < this.pos.length; i++) {
+            this.vel[i].y += GRAVITY
             let updatedX = this.pos[i].x + this.vel[i].x
             let updatedY = this.pos[i].y + this.vel[i].y
             if (updatedX < 0) {
@@ -134,7 +135,6 @@
             
             this.vel[i].x /= AIRFRICTION
             this.vel[i].y /= AIRFRICTION
-            this.vel[i].y += GRAVITY
           }
           let center = getCenter(this.pos)
 
@@ -153,7 +153,10 @@
           
           let optimalRotation = Math.atan2(a1, a2)
           // END magic thing that actually works and doesn't explode
-
+          let centerVel = {
+            x: center.x - this.prevCenter.x,
+            y: center.y - this.prevCenter.y
+          }
           for (let i = 0; i < this.pos.length; i++) {
             let targetPos = rotate(this.initPos[i], optimalRotation, this.initCenter)
             targetPos.x += center.x - this.initCenter.x
@@ -163,9 +166,9 @@
             this.DEBUG_targetPos[i] = targetPos
             // create a spring between the target position and current point
             let springForce = computeSpringForce(this.pos[i], targetPos, STIFFNESS)
-            let springDamping = computeSpringDamping(center - this.prevCenter, this.vel[i], DAMPING)
-            this.vel[i].x += springForce.x + springDamping.x
-            this.vel[i].y += springForce.y + springDamping.y
+            let springDamping = computeSpringDamping(this.vel[i], centerVel, DAMPING)
+            this.vel[i].x += springForce.x - springDamping.x
+            this.vel[i].y += springForce.y - springDamping.y
           }
           this.prevCenter = center
         }
@@ -227,7 +230,7 @@
         return points
       }
       let bodies = [
-        new SoftBody(circle(1000,1000,400,30))
+        new SoftBody(circle(1000,1000,400,30),50,10)
       ]
       
       
@@ -244,7 +247,7 @@
         requestAnimationFrame(animate)
       }
       requestAnimationFrame(animate)
-    </script>
-  </body>
+  </script>
+</body>
 
-  </html>
+</html>
