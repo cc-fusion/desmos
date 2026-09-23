@@ -228,8 +228,10 @@
       updateIntersection() {
         for (let body of bodies) {
           if (body.UUID == this.UUID) continue
-          if (ptInPolygon(body.pos[i], bodies[0].pos)) {
-            closestVertices()
+          for (let i = 0; i < body.length; i++) {
+            if (ptInPolygon(body.pos[i], bodies[0].pos)) {
+              let vertices = closestVertices(this., body)
+            }
           }
         }
       }
