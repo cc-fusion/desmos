@@ -78,11 +78,11 @@
         return Math.min(Math.max(min, val), max)
       }
       const BOUNCINESS = 1
-      const GRAVITY = 1
+      const GRAVITY = 0.05
       const STIFFNESS = 1
-      const WALLFRICTION = 5
+      const WALLFRICTION = 10
       const AIRFRICTION = 1
-      const DAMPING = 0.5
+      const DAMPING = 0.1
       const halfPi = Math.PI/2
       class SoftBody {
         constructor(pos, velX=0, velY=0) {
@@ -230,7 +230,8 @@
         return points
       }
       let bodies = [
-        new SoftBody(circle(1000,1000,400,30),50,10)
+        new SoftBody(circle(500,500,400,8),5,0.2),
+        new SoftBody(circle(1500,1500,400,8),-5,0),
       ]
       
       
