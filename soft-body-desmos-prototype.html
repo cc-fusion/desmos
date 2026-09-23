@@ -40,6 +40,30 @@
       }
       return {x: centerX/pts.length, y: centerY/pts.length}
     }
+    function distance(a, b, c, d) {
+      if (typeof a == "object") {
+        return distance(a.x, a.y, b.x, b.y)
+      } else {
+        return Math.sqrt((a-c)**2+(b-d)**2)
+      }
+    }
+    function closestVertices(pt, polygon) {
+      let minLength = 1/0
+      let minIdx = -1
+      for (let i = 0; i < polygon.length; i++) {
+        let idx1 = i
+        let idx2 = (i+1)%polygon.length
+        let currLength = distance(pt, polygon[idx1]) + distance(pt, polygon[idx2])
+        if (currLength < minLength) {
+          minLength = currLength
+          minIdx = i
+        }
+      }
+      return [
+        polygon[i],
+        polygon[(i+1)%polygon.length]
+      ]
+    }
     // Springs
     function computeSpringForce(pos, target, stiffness) {
       // F = -kx
@@ -205,14 +229,14 @@
         for (let body of bodies) {
           if (body.UUID == this.UUID) continue
           if (ptInPolygon(body.pos[i], bodies[0].pos)) {
-            
+            closestVertices()
           }
         }
-        
       }
       update() {
         this.updateVelocity()
         this.updateShape()
+        this.updateIntersection()
       }
     }
     function distance(x1, y1, x2, y2) {
