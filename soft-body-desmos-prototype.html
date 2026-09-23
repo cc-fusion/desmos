@@ -157,6 +157,33 @@
       return intersections % 2 == 1
     }
 
+    // Vector2 (TODO: switch everything to vectors for simplicity)
+
+    class Vector2 {
+      constructor(x, y) {
+        this.x = x
+        this.y = y
+      }
+      add(otherVec) {
+        this.x += otherVec.x
+        this.y += otherVec.y
+      }
+      subtract(otherVec) {
+        this.x -= otherVec.x
+        this.y -= otherVec.y
+      }
+      multiplyScalar(num) {
+        this.x *= num
+        this.y *= num
+      }
+      dot(other) {
+        return this.x * other.x + this.y * other.y
+      }
+      cross(other) {
+        return this.x * other.y + this.y * other.x
+      }
+    }
+
     class SoftBody {
       static ID = 1
       constructor(pos, velX=0, velY=0) {
@@ -250,12 +277,24 @@
         this.prevCenter = center
       }
       updateIntersection() {
-        for (let body of bodies) {
-          if (body.UUID == this.UUID) continue
-          for (let i = 0; i < body.pos.length; i++) {
-            if (ptInPolygon(body.pos[i], bodies[0].pos)) {
-              let vertices = closestVertices(body.pos[i], this.pos)
-              closestPointOnSegment(body.pos[i], vertices[0], vertices[1])
+        for (let otherBody of bodies) {
+          if (otherBody.UUID == this.UUID) continue
+          for (let i = 0; i < this.pos.length; i++) {
+            if (ptInPolygon(this.pos[i], otherBody.pos)) {
+              let vertices = closestVertices(this.pos[i], otherBody.pos)
+              let closestPoint = closestPointOnSegment(this.pos[i], vertices[0], vertices[1])
+              let distanceRatio = distance(vertices[0],closestPoint)/distance(vertices[0], vertices[1])
+              let penetrationDepth = distance(closestPoint, this.pos[i])/10
+              let pointToSegmentForceVec = norm({
+                x: (this.pos[i].x - closestPoint.x),
+                y: (this.pos[i].y - closestPoint.y)
+              })
+              this.pos[i].x -= pointToSegmentForceVec.x * penetrationDepth
+              this.pos[i].y -= pointToSegmentForceVec.y * penetrationDepth
+              vertices[0].x += pointToSegmentForceVec.x * penetrationDepth * distanceRatio
+              vertices[0].y += pointToSegmentForceVec.y * penetrationDepth * distanceRatio
+              vertices[1].x += pointToSegmentForceVec.x * penetrationDepth * (1-distanceRatio)
+              vertices[1].y += pointToSegmentForceVec.y * penetrationDepth * (1-distanceRatio)
             }
           }
         }
