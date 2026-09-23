@@ -22,14 +22,7 @@
     canvas.width = internalSize
     canvas.height = internalSize
     let ctx = canvas.getContext("2d")
-    function calculateAngle(pos1, pos2) {
-      let distY = pos2.y - pos1.y
-      let distX = pos2.x - pos1.x
-      return Math.atan2(distY, distX)
-    }
-    function calculateNormAngle(pos1, pos2) {
-      return calculateAngle(norm(pos1), norm(pos2))
-    }
+    // Helpers
     function norm(pos) {
       let dist = distance({x:0,y:0}, pos)
       return {
@@ -47,6 +40,7 @@
       }
       return {x: centerX/pts.length, y: centerY/pts.length}
     }
+    // Springs
     function computeSpringForce(pos, target, stiffness) {
       // F = -kx
       let displacementX = pos.x - target.x
@@ -61,6 +55,7 @@
         y: damping * (vel.y - relativeVel.y)
       }
     }
+    // Trig
     function rotate(pos, theta, center={x:0,y:0}) {
       let cos = Math.cos(theta)
       let sin = Math.sin(theta)
@@ -69,6 +64,15 @@
         y: (pos.x-center.x)*sin + (pos.y-center.y)*cos + center.y,
       }
     }
+    function calculateAngle(pos1, pos2) {
+      let distY = pos2.y - pos1.y
+      let distX = pos2.x - pos1.x
+      return Math.atan2(distY, distX)
+    }
+    function calculateNormAngle(pos1, pos2) {
+      return calculateAngle(norm(pos1), norm(pos2))
+    }
+    // Clamp
     function clampMod(val, min, max) {
       while (val < min) val += max-min
       while (val > max) val -= max-min
@@ -77,16 +81,26 @@
     function clamp(val, min, max) {
       return Math.min(Math.max(min, val), max)
     }
+    // Raycasting + point-in-polygon
     function raycastHoriz0(x1, y1, x2, y2) {
       // check if line segment (x1, y1, x2, y2) intersects y=0 for x>=0
-      if (y1 * y2 > 0) return false // y1 and y2 must be on opposite sides of the y=0 axis. They will be positive if they are on the same side
+      if ((y1 > 0) === (y2 > 0)) return false // y1 and y2 must not be on the same side of the y=0 axis
       
+      let intersection = x1 - y1 * (x2 - x1)/(y2 - y1) // this also works for edge cases where y1 or y2 is on one of the points
+      return intersection >= 0
+    }
+    function raycastHoriz(a, b, x1, y1, x2, y2) {
+      return raycastHoriz0(x1-a, y1-b, x2-a, y2-b)
     }
     function ptInPolygon(pt, polygon) {
       // odd intersections: true, even: false
-      for (let i = 1; i < polygon.length; i++) {
-        polygon[i-1] polygon[i]
+      let intersections = 0
+      for (let i = 0; i < polygon.length; i++) {
+        let idx1 = i
+        let idx2 = (i+1)%polygon.length
+        intersections += raycastHoriz(pt.x, pt.y, polygon[idx1].x, polygon[idx1].y, polygon[idx2].x, polygon[idx2].y)
       }
+      return intersections % 2 == 1
     }
     const BOUNCINESS = 1
     const GRAVITY = 0.05
@@ -96,7 +110,10 @@
     const DAMPING = 0.1
     const halfPi = Math.PI/2
     class SoftBody {
+      static ID = 1
       constructor(pos, velX=0, velY=0) {
+        this.UUID = SoftBody.ID
+        SoftBody.ID++
         this.initPos = []
         for (let p of pos) {
           this.initPos.push({x: p.x, y: p.y})
@@ -184,6 +201,15 @@
         }
         this.prevCenter = center
       }
+      updateIntersection() {
+        for (let body of bodies) {
+          if (body.UUID == this.UUID) continue
+          if (ptInPolygon(body.pos[i], bodies[0].pos)) {
+            
+          }
+        }
+        
+      }
       update() {
         this.updateVelocity()
         this.updateShape()
@@ -230,7 +256,7 @@
           ctx.fill()
 
           // actual pts
-          ctx.fillStyle = "#f00"
+          ctx.fillStyle = "#000"
           ctx.beginPath()
           ctx.arc(body.pos[i].x, body.pos[i].y, 10, 0, 6.29)
           ctx.fill()
