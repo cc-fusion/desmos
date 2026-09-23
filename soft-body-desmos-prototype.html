@@ -55,31 +55,26 @@
       for (let i = 0; i < polygon.length; i++) {
         let idx1 = i
         let idx2 = (i+1)%polygon.length
-        let currLength = distance(pt, polygon[idx1]) + distance(pt, polygon[idx2])
+        let currLength = closestPointOnSegment(pt, polygon[idx1], polygon[idx2])
         if (currLength < minLength) {
           minLength = currLength
           minIdx = i
         }
       }
+      if (minIdx == -1) throw "Something went wrong in closestVerticesIdx (minIdx == -1). " + `pt = ${JSON.stringify(pt)}, polygon = ${JSON.stringify(polygon)}`
       return minIdx
     }
-    function closestPointOnSegment(pt, pt1, pt2) {
-      // todo: convert to lin. alg
-      // Find y=mx+b
-      // calculate slope
-      let m1 = (pt2.y - pt1.y)/(pt2.x - pt1.x)
-      let b1 = pt1.y - m1 * pt1.x
-
-      // Find the y=mx+b for the perpendicular segment, then find the intersection
-      // perpendicular slope must be m'=-1/m
-      let m2 = -1/m1
-      let b2 = pt.y - m2 * pt.x
+    function closestPointOnSegment(p, a, b) {
+      // magic function that does some linear algebra and somehow doesn't crash
+      let ab = b.copy().subtract(a)
+      let ap = p.copy().subtract(a)
+      let abLenSq = ab.x * ab.x + ab.y * ab.y
       
-      // Find point of intersection
-      let x = (b2-b1)/(m1-m2)
-      let y = m1*x+b1
+      if (abLenSq === 0) return a.copy()
 
-      return new Vector2(x,y)
+      // Project ap onto ab, clamped between 0 and 1
+      let t = clamp((ap.x * ab.x + ap.y * ab.y) / abLenSq, 0, 1)
+      return a.copy().add(ab.multiplyScalar(t))
     }
     function clampMod(val, min, max) {
       while (val < min) val += max-min
@@ -260,16 +255,17 @@
       updateIntersection() {
         for (let otherBody of bodies) {
           if (otherBody.UUID == this.UUID) continue
+          let otherPos = otherBody.pos
+          let otherVel = otherBody.vel
           for (let i = 0; i < this.pos.length; i++) {
             let pos = this.pos[i]
 
-            if (ptInPolygon(pos, otherBody.pos)) {
-              let verticesIdx = closestVerticesIdx(pos, otherBody.pos)
-              let vertex1Pos = otherBody.pos[verticesIdx]
-              let vertex1Vel = otherBody.vel[verticesIdx]
-              let vertex2Pos = otherBody.pos[(verticesIdx+1)%otherBody.pos.length]
-              let vertex2Vel = otherBody.vel[(verticesIdx+1)%otherBody.vel.length]
-              
+            if (ptInPolygon(pos, otherPos)) {
+              let verticesIdx = closestVerticesIdx(pos, otherPos)
+              let vertex1Pos = otherPos[verticesIdx]
+              let vertex1Vel = otherVel[verticesIdx]
+              let vertex2Pos = otherPos[(verticesIdx+1)%otherPos.length]
+              let vertex2Vel = otherVel[(verticesIdx+1)%otherVel.length]
               let closestPoint = closestPointOnSegment(pos, vertex1Pos, vertex2Pos)
 
               let distanceRatio = distance(vertex1Pos, closestPoint)/distance(vertex1Pos, vertex2Pos)
