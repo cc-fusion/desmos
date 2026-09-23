@@ -72,7 +72,9 @@
         return Math.min(Math.max(min, val), max)
       }
       const BOUNCINESS = 0
-      const GRAVITY = 1
+      const GRAVITY = 10
+      const STIFFNESS = 1
+      const WALLFRICTION = 1.5
       const halfPi = Math.PI/2
       class SoftBody {
         constructor(pos) {
@@ -89,7 +91,7 @@
           this.pos = pos
           this.vel = []
           for (let p of pos) {
-            this.vel.push({x:0,y:0})
+            this.vel.push({x:100,y:0})
           }
           this.DEBUG_targetPos=[]
         }
@@ -101,24 +103,28 @@
             if (updatedX < 0) {
               this.pos[i].x = 0
               this.vel[i].x *= -BOUNCINESS
+              this.vel[i].y /= WALLFRICTION
             } else if (updatedX > canvas.width) {
               this.pos[i].x = canvas.width
               this.vel[i].x *= -BOUNCINESS
+              this.vel[i].y /= WALLFRICTION
             } else {
               this.pos[i].x = updatedX
             }
             if (updatedY < 0) {
               this.pos[i].y = 0
               this.vel[i].y *= -BOUNCINESS
+              this.vel[i].x /= WALLFRICTION
             } else if (updatedY > canvas.height) {
               this.pos[i].y = canvas.height
               this.vel[i].y *= -BOUNCINESS
+              this.vel[i].x /= WALLFRICTION
             } else {
               this.pos[i].y = updatedY
             }
             
-            this.vel[i].x /= 1.1
-            this.vel[i].y /= 1.1
+            this.vel[i].x /= 1.01
+            this.vel[i].y /= 1.01
             this.vel[i].y += GRAVITY
           }
           let center = getCenter(this.pos)
@@ -143,11 +149,11 @@
             let targetPos = rotate(this.initPos[i], optimalRotation, this.initCenter)
             targetPos.x += center.x - this.initCenter.x
             targetPos.y += center.y - this.initCenter.y
-            targetPos.x = clamp(targetPos.x, 0, canvas.width)
-            targetPos.y = clamp(targetPos.y, 0, canvas.height)
+            //targetPos.x = clamp(targetPos.x, 0, canvas.width)
+            //targetPos.y = clamp(targetPos.y, 0, canvas.height)
             this.DEBUG_targetPos[i] = targetPos
             // create a spring between the target position and current point
-            let springForce = computeSpringForce(this.pos[i], targetPos, 0.1)
+            let springForce = computeSpringForce(this.pos[i], targetPos, STIFFNESS)
             this.vel[i].x += springForce.x
             this.vel[i].y += springForce.y
           }
@@ -210,7 +216,7 @@
         return points
       }
       let bodies = [
-        new SoftBody(circle(1000,1000,400,11))
+        new SoftBody(circle(1000,1000,400,30))
       ]
       
       
