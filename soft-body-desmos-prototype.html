@@ -301,11 +301,24 @@
     }
 
     // Input
-
+    let mouse = {x: 0, y: 0, down: false}
     function initListeners() {
-      addEventListener("mousemove", (e) => {
-
+      addEventListener("mousedown", (e) => {
+        mouse.x = e.clientX * window.innerWidth / canvas.width
+        mouse.y = e.clientY * window.innerHeight / canvas.height
+        mouse.down = true
+        place()
       })
+      addEventListener("mouseup", (e) => {
+        mouse.down = false
+      })
+      addEventListener("mousemove", (e) => {
+        mouse.x = e.clientX * window.innerWidth / canvas.width
+        mouse.y = e.clientY * window.innerHeight / canvas.height
+      })
+    }
+    function place() {
+      bodies.push(new SoftBody(circle(mouse.x, mouse.y, 100, 10)))
     }
 
     // Animation
@@ -385,6 +398,7 @@
       lastDraw = Date.now()
       requestAnimationFrame(animate)
     }
+    init()
     requestAnimationFrame(animate)
   </script>
 </body>
