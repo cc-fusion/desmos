@@ -281,10 +281,13 @@
         let thisBoundingBox = getBoundingBox(this.pos)
         for (let otherBody of bodies) {
           if (otherBody.UUID == this.UUID) continue
-          let otherBoundingBox = getBoundingBox(otherBody.pos)
-          if (!collisionAABB(thisBoundingBox, otherBoundingBox)) return
+          
           let otherPos = otherBody.pos
           let otherVel = otherBody.vel
+
+          let otherBoundingBox = getBoundingBox(otherPos)
+          if (!collisionAABB(thisBoundingBox, otherBoundingBox)) continue
+
           for (let i = 0; i < this.pos.length; i++) {
             let pos = this.pos[i]
 
