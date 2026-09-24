@@ -17,7 +17,6 @@
 <body>
   <canvas id="canvas"></canvas>
   <script>
-    let deployment = "dev"
     let internalSize = 2000
     canvas.width = internalSize
     canvas.height = internalSize
@@ -26,14 +25,21 @@
     // Constants
 
     const BOUNCINESS = 0.2
-    const GRAVITY = 0.3
-    const STIFFNESS = 0.5
-    const WALLFRICTION = 100
+    const GRAVITY = 2
+    const STIFFNESS = 0.9
+    const WALLFRICTION = 1.2
     const AIRFRICTION = 1
     const DAMPING = 0.1
-    const halfPi = Math.PI/2
 
-    // Helpers
+    // Helper functions
+
+    function distance(a, b, c, d) {
+      if (typeof a == "object") {
+        return distance(a.x, a.y, b.x, b.y)
+      } else {
+        return Math.sqrt((a-c)**2+(b-d)**2)
+      }
+    }
     function getCenter(pts) {
       let center = new Vector2(0,0)
       
@@ -41,13 +47,6 @@
         center.add(p)
       }
       return center.multiplyScalar(1/pts.length)
-    }
-    function distance(a, b, c, d) {
-      if (typeof a == "object") {
-        return distance(a.x, a.y, b.x, b.y)
-      } else {
-        return Math.sqrt((a-c)**2+(b-d)**2)
-      }
     }
     function closestVerticesIdx(pt, polygon) {
       let minLength = 1/0
@@ -75,11 +74,6 @@
       // Project ap onto ab, clamped between 0 and 1
       let t = clamp((ap.x * ab.x + ap.y * ab.y) / abLenSq, 0, 1)
       return a.copy().add(ab.multiplyScalar(t))
-    }
-    function clampMod(val, min, max) {
-      while (val < min) val += max-min
-      while (val > max) val -= max-min
-      return val
     }
     function clamp(val, min, max) {
       return Math.min(Math.max(min, val), max)
@@ -109,8 +103,7 @@
       maxA.y >= minB.y
     }
 
-
-    // Springs
+    // Spring calculations
     function computeSpringForce(pos, target, stiffness) {
       // F = -kx
       return pos.copy().subtract(target).multiplyScalar(-stiffness) // -4 lines with vectors!
@@ -119,25 +112,8 @@
       return vel.copy().subtract(relativeVel).multiplyScalar(damping)
     }
 
-    // Trig
-    function rotate(pos, theta, center={x:0,y:0}) {
-      let cos = Math.cos(theta)
-      let sin = Math.sin(theta)
-      return new Vector2(
-        (pos.x-center.x)*cos - (pos.y-center.y)*sin + center.x,
-        (pos.x-center.x)*sin + (pos.y-center.y)*cos + center.y
-      )
-    }
-    function calculateAngle(pos1, pos2) {
-      let distY = pos2.y - pos1.y
-      let distX = pos2.x - pos1.x
-      return Math.atan2(distY, distX)
-    }
-    function calculateNormAngle(pos1, pos2) {
-      return calculateAngle(norm(pos1), norm(pos2))
-    }
-
     // Raycasting + point-in-polygon
+
     function raycastHoriz0(x1, y1, x2, y2) {
       // check if line segment (x1, y1, x2, y2) intersects y=0 for x>=0
       if ((y1 > 0) === (y2 > 0)) return false // y1 and y2 must not be on the same side of the y=0 axis
@@ -158,6 +134,8 @@
       }
       return intersections % 2 == 1
     }
+
+    // Vectors
 
     class Vector2 {
       constructor(x, y) {this.x = x;this.y = y}
@@ -191,6 +169,8 @@
       }
       copy() {return new Vector2(this.x, this.y)}
     }
+
+    // Soft body
 
     class SoftBody {
       static ID = 1
@@ -318,12 +298,14 @@
         this.updateIntersection()
       }
     }
+
+    // Animation
+
     function update() {
       for (let body of bodies) {
         body.update()
       }
     }
-    let debug = 1
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       for (let body of bodies) {
@@ -360,6 +342,9 @@
         }
       }
     }
+
+    // Initialization
+
     function circle(x,y, radius, numpts) {
       let points = []
       for (let i = 0; i < numpts; i++) {
@@ -371,16 +356,17 @@
       }
       return points
     }
+
     let bodies = [
-      new SoftBody(circle(500,1500,200,40),0,0),
-      new SoftBody(circle(1000,1500,200,40),0,0),
-      new SoftBody(circle(1500,1500,200,40),0,0),
-      new SoftBody(circle(500,1000,200,40),0,0),
-      new SoftBody(circle(1000,1000,200,40),0,0),
-      new SoftBody(circle(1500,1000,200,40),0,0),
       
     ]
+    for (let i = 200; i < 2000; i += 401) {
+      for (let j = 200; j < 2000; j += 401) {
+        bodies.push(new SoftBody(circle(i,j,200,10),0,0))
+      }
+    }
     
+    // Main loop
     
     let lastDraw = 0
     let frameRate = 60
