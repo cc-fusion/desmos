@@ -146,7 +146,7 @@
       cross(other) {return this.x * other.y + this.y * other.x;return this}
       norm() {
         let dist = this.magnitude
-        if (dist == 0) throw "Cannot normalize zero vector."
+        if (dist == 0) return this // return 0 vector
         this.x /= dist;this.y /= dist
         return this
       }
@@ -278,8 +278,9 @@
               let vertex2Pos = otherPos[(verticesIdx+1)%otherPos.length]
               let vertex2Vel = otherVel[(verticesIdx+1)%otherVel.length]
               let closestPoint = closestPointOnSegment(pos, vertex1Pos, vertex2Pos)
-
-              let distanceRatio = distance(vertex1Pos, closestPoint)/distance(vertex1Pos, vertex2Pos)
+              
+              let vertexDist = distance(vertex1Pos, vertex2Pos)
+              let distanceRatio = vertexDist == 0 ? distance(vertex1Pos, closestPoint)/vertexDist : 0.5
 
               let penetrationDepth = distance(closestPoint, pos)
 
@@ -287,7 +288,7 @@
 
               this.vel[i].subtract(pointToSegmentForceVec)
               vertex1Vel.add(pointToSegmentForceVec.copy().multiplyScalar(1-distanceRatio))
-              vertex2Vel.add(pointToSegmentForceVec.copy().multiplyScalar(distanceRatio))
+              vertex2Vel.add(pointToSegmentForceVec.copy().multiplyScalar(distanceRatio)) 
             }
           }
         }
@@ -297,6 +298,14 @@
         this.updateShape()
         this.updateIntersection()
       }
+    }
+
+    // Input
+
+    function initListeners() {
+      addEventListener("mousemove", (e) => {
+
+      })
     }
 
     // Animation
@@ -345,6 +354,9 @@
 
     // Initialization
 
+    function init() {
+      initListeners()
+    }
     function circle(x,y, radius, numpts) {
       let points = []
       for (let i = 0; i < numpts; i++) {
@@ -357,14 +369,7 @@
       return points
     }
 
-    let bodies = [
-      
-    ]
-    for (let i = 200; i < 2000; i += 401) {
-      for (let j = 200; j < 2000; j += 401) {
-        bodies.push(new SoftBody(circle(i,j,200,10),0,0))
-      }
-    }
+    let bodies = []
     
     // Main loop
     
