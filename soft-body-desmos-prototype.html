@@ -55,7 +55,7 @@
       for (let i = 0; i < polygon.length; i++) {
         let idx1 = i
         let idx2 = (i+1)%polygon.length
-        let currLength = closestPointOnSegment(pt, polygon[idx1], polygon[idx2])
+        let currLength = distance(pt, closestPointOnSegment(pt, polygon[idx1], polygon[idx2]))
         if (currLength < minLength) {
           minLength = currLength
           minIdx = i
@@ -84,6 +84,31 @@
     function clamp(val, min, max) {
       return Math.min(Math.max(min, val), max)
     }
+    function getBoundingBox(polygon) {
+      let vectorMin = new Vector2(1/0,1/0)
+      let vectorMax = new Vector2(-1/0, -1/0)
+      for (let pt of polygon) {
+        if (pt.x < vectorMin.x) vectorMin.x = pt.x
+        if (pt.y < vectorMin.y) vectorMin.y = pt.y
+        if (pt.x > vectorMax.x) vectorMax.x = pt.x
+        if (pt.y > vectorMax.y) vectorMax.y = pt.y
+      }
+      return {
+        min: vectorMin,
+        max: vectorMax
+      }
+    }
+    function collisionAABB(boxA, boxB) {
+      let minA = boxA.min
+      let maxA = boxA.max
+      let minB = boxB.min
+      let maxB = boxB.max
+      return minA.x <= maxB.x &&
+      maxA.x >= minB.x &&
+      minA.y <= maxB.y &&
+      maxA.y >= minB.y
+    }
+
 
     // Springs
     function computeSpringForce(pos, target, stiffness) {
@@ -253,8 +278,11 @@
         this.prevCenter = center
       }
       updateIntersection() {
+        let thisBoundingBox = getBoundingBox(this.pos)
         for (let otherBody of bodies) {
           if (otherBody.UUID == this.UUID) continue
+          let otherBoundingBox = getBoundingBox(otherBody.pos)
+          if (!collisionAABB(thisBoundingBox, otherBoundingBox)) return
           let otherPos = otherBody.pos
           let otherVel = otherBody.vel
           for (let i = 0; i < this.pos.length; i++) {
@@ -341,8 +369,13 @@
       return points
     }
     let bodies = [
-      new SoftBody(circle(500,500,400,80),7,-5),
-      new SoftBody(circle(1500,1500,400,80),-9,0),
+      new SoftBody(circle(500,1500,200,40),0,0),
+      new SoftBody(circle(1000,1500,200,40),0,0),
+      new SoftBody(circle(1500,1500,200,40),0,0),
+      new SoftBody(circle(500,1000,200,40),0,0),
+      new SoftBody(circle(1000,1000,200,40),0,0),
+      new SoftBody(circle(1500,1000,200,40),0,0),
+      
     ]
     
     
