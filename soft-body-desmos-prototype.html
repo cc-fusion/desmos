@@ -29,7 +29,7 @@
     const STIFFNESS = 0.9
     const WALLFRICTION = 1.2
     const AIRFRICTION = 1
-    const DAMPING = 0.1
+    const DAMPING = 0.2
 
     // Helper functions
 
@@ -277,18 +277,28 @@
               let vertex1Vel = otherVel[verticesIdx]
               let vertex2Pos = otherPos[(verticesIdx+1)%otherPos.length]
               let vertex2Vel = otherVel[(verticesIdx+1)%otherVel.length]
+
               let closestPoint = closestPointOnSegment(pos, vertex1Pos, vertex2Pos)
               
-              let vertexDist = distance(vertex1Pos, vertex2Pos)
-              let distanceRatio = vertexDist == 0 ? distance(vertex1Pos, closestPoint)/vertexDist : 0.5
+              let vertexLength = distance(vertex1Pos, vertex2Pos)
+
+              let distanceRatio = vertexLength == 0 ? 0.5 : distance(vertex1Pos, closestPoint)/vertexLength
 
               let penetrationDepth = distance(closestPoint, pos)
+
+              // vector from intersecting point to closest point to surface
 
               let pointToSegmentForceVec = pos.copy().subtract(closestPoint)
 
               this.vel[i].subtract(pointToSegmentForceVec)
               vertex1Vel.add(pointToSegmentForceVec.copy().multiplyScalar(1-distanceRatio))
-              vertex2Vel.add(pointToSegmentForceVec.copy().multiplyScalar(distanceRatio)) 
+              vertex2Vel.add(pointToSegmentForceVec.copy().multiplyScalar(distanceRatio))
+
+              pointToSegmentForceVec.norm().multiplyScalar(penetrationDepth * 0.5)
+
+              this.pos[i].subtract(pointToSegmentForceVec)
+              vertex1Pos.add(pointToSegmentForceVec.copy().multiplyScalar(distanceRatio))
+              vertex2Pos.add(pointToSegmentForceVec.copy().multiplyScalar(1-distanceRatio))
             }
           }
         }
@@ -303,9 +313,10 @@
     // Input
     let mouse = {x: 0, y: 0, down: false}
     function initListeners() {
+      let rect = canvas.getBoundingClientRect()
       addEventListener("mousedown", (e) => {
-        mouse.x = e.clientX * window.innerWidth / canvas.width
-        mouse.y = e.clientY * window.innerHeight / canvas.height
+        mouse.x = (e.clientX - rect.x) / rect.width * canvas.width
+        mouse.y = (e.clientY - rect.y) / rect.height * canvas.height
         mouse.down = true
         place()
       })
@@ -313,12 +324,12 @@
         mouse.down = false
       })
       addEventListener("mousemove", (e) => {
-        mouse.x = e.clientX * window.innerWidth / canvas.width
-        mouse.y = e.clientY * window.innerHeight / canvas.height
+        mouse.x = (e.clientX - rect.x) / rect.width * canvas.width
+        mouse.y = (e.clientY - rect.y) / rect.height * canvas.height
       })
     }
     function place() {
-      bodies.push(new SoftBody(circle(mouse.x, mouse.y, 100, 10)))
+      bodies.push(new SoftBody(circle(mouse.x, mouse.y, Math.random()*100+100, 20)))
     }
 
     // Animation
@@ -328,6 +339,7 @@
         body.update()
       }
     }
+    let drawDebug = false
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       for (let body of bodies) {
@@ -341,25 +353,35 @@
         ctx.lineTo(body.pos[0].x, body.pos[0].y)
         ctx.stroke()
 
-        for (let i = 0; i < body.pos.length; i++) {
-          // spring from target pos to actual pos
-          ctx.strokeStyle = "#99f"
-          ctx.lineWidth=3
-          ctx.beginPath()
-          ctx.moveTo(body.DEBUG_targetPos[i].x, body.DEBUG_targetPos[i].y)
-          ctx.lineTo(body.pos[i].x, body.pos[i].y)
-          ctx.stroke()
+        if (drawDebug) {
+          for (let i = 0; i < body.pos.length; i++) {
+            // spring from target pos to actual pos
+            ctx.strokeStyle = "#99f"
+            ctx.lineWidth=3
+            ctx.beginPath()
+            ctx.moveTo(body.DEBUG_targetPos[i].x, body.DEBUG_targetPos[i].y)
+            ctx.lineTo(body.pos[i].x, body.pos[i].y)
+            ctx.stroke()
 
-          // debug pts
-          ctx.fillStyle = "#99f"
-          ctx.beginPath()
-          ctx.arc(body.DEBUG_targetPos[i].x, body.DEBUG_targetPos[i].y, 10, 0, 6.29)
-          ctx.fill()
+            // debug pts
+            ctx.fillStyle = "#99f"
+            ctx.beginPath()
+            ctx.arc(body.DEBUG_targetPos[i].x, body.DEBUG_targetPos[i].y, 10, 0, 6.29)
+            ctx.fill()
 
-          // actual pts
-          ctx.fillStyle = "#000"
+            // actual pts
+            ctx.fillStyle = "#000"
+            ctx.beginPath()
+            ctx.arc(body.pos[i].x, body.pos[i].y, 10, 0, 6.29)
+            ctx.fill()
+          }
+        } else {
           ctx.beginPath()
-          ctx.arc(body.pos[i].x, body.pos[i].y, 10, 0, 6.29)
+          ctx.moveTo(body.pos[0].x, body.pos[0].y)
+          for (let i = 0; i < body.pos.length; i++) {
+            ctx.lineTo(body.pos[i].x, body.pos[i].y)
+          }
+          ctx.lineTo(body.pos[0].x, body.pos[0].y)
           ctx.fill()
         }
       }
