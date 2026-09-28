@@ -25,10 +25,11 @@ List:
 ## Variables
 Variables must contain only one letter that is NOT x, y, or e. Variables may contain subscripts of any length which may only contain letters and digits. Variables may also contain the following Greek letters (but not as a subscript):
 - 
+Variables can NOT be defined in a function
 ## Parametric equations
 
 ## Functions:
-Syntax 
+Recursion is allowed, but only up to 10,000 times.
 ## List operations:
 
 ## Constants:
@@ -37,11 +38,44 @@ Syntax
 \e
 \infty or \infinity
 ## Piecewise:
+All values in a piecewise function must have the same type with the following exceptions:
+- 
+Syntax:
+{expression1:a,expression2:b,default}
+If a default value is not provided, it returns undefined. Expressions are evaluated from left to right and stop on the first true statement.
+Piecewise functions can also be written in if statement format:
+if expression1:
+  a
+else if expression2: # elif (expression2):
+  b
+else:
+  default
+and
+if expression1: a
+else if expression2: b
+else: default
+is equivalent to {expression1:a,expression2:b,default}
 
+ternary operators are supported in the following format:
+value_if_true if condition else value_if_false
+condition?value_if_true:value_if_false
 ## Syntax:
 
 ## Loops:
+Syntax:
+L = i for i = [1...10]
+or
+L = {
+  for i = [1...10]:
+    i
+}
 
-## Language-specific:
+`for i = b` is equivalent to `for i of b` is equivalent to `for i in b`
+parenthesis after `for` is ok (eg. `for (i of b)`)
+
+## Special:
+Comments are supported using #, //, /* */
+Data type prefixes are supported but not required:
+Number/int, Point, List<Type>/Array<Type>, Polygon, Color, Any, ListAny, ListNumber, ListPoint, ListColor, ListPolygon
 
 ## Examples:
