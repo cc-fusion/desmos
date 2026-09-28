@@ -25,7 +25,31 @@ List:
 ## Variables
 Variables must contain only one letter that is NOT x, y, or e. Variables may contain subscripts of any length which may only contain letters and digits. Variables may also contain the following Greek letters (but not as a subscript):
 - 
-Variables can NOT be defined in a function
+Variables can be defined in a function, but a variable CANNOT be based off of another variable if in a function.
+Example:
+OK (equals `a+b with a=1,b=2`):
+```
+a = 1
+b = 2
+a + b
+```
+
+Not OK (equals `a+b with a=1,b=a`):
+```
+a = 1
+b = a + 1
+a + b
+```
+
+Variables may only exist in one level at a time (because the equivalent would mean a with statement within a with statement)
+Not OK (equals `(a+b with b=2) with a=1`)
+```
+a=1
+(
+  b=2
+  a + b
+)
+```
 ## Parametric equations
 
 ## Functions:
@@ -65,10 +89,10 @@ condition?value_if_true:value_if_false
 Syntax:
 L = i for i = [1...10]
 or
-L = {
+L = (
   for i = [1...10]:
     i
-}
+)
 
 `for i = b` is equivalent to `for i of b` is equivalent to `for i in b`
 parenthesis after `for` is ok (eg. `for (i of b)`)
