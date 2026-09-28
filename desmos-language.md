@@ -76,6 +76,6 @@ parenthesis after `for` is ok (eg. `for (i of b)`)
 ## Special:
 Comments are supported using #, //, /* */
 Data type prefixes are supported but not required:
-Number/int, Point, List<Type>/Array<Type>, Polygon, Color, Any, ListAny, ListNumber, ListPoint, ListColor, ListPolygon
+Number/int, Point, List<Type>/Array<Type>, Polygon, Color, Any, ListAny, ListNumber, ListPoint, ListColor, ListPolygon, List (same as List<Number>)
 
 ## Examples:
