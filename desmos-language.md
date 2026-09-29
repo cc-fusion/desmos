@@ -1,17 +1,19 @@
-# Desmos-supported programming language — draft reference
+# Desmos-Supported Programming Language — Draft Reference
 
-## 1. Values and types
+---
+
+## 1. Values and Types
 
 | Type | Description |
 |---|---|
 | `Number` or `int` | A JavaScript-style numeric value; decimals are allowed. `int` is an alias, not a separate integer-only type. |
-| `Point` | A 2D or 3D point. Points with imaginary coordinates produce an undefined value. |
+| `Point` | A 2D `(x, y)` or 3D `(x, y, z)` coordinate tuple. Points with imaginary coordinates produce `undefined`. |
 | `List<T>` or `Array<T>` | An ordered, homogeneous list of at most 10,000 items. `T` cannot itself be a list. |
-| `Polygon` | A polygon containing at most 10,000 items. Its vertices must be 2D points. |
+| `Polygon` | A 2D planar polygon containing at most 10,000 vertices. |
 | `Color` | A color constructed with `rgb`, `hsv`, `okhsv`, `oklab`, or `oklch`. |
 | `Any` | An unconstrained value, primarily for function parameters or intermediate results. Its use does not waive list homogeneity. |
 
-Convenience type names:
+### Convenience Type Names
 
 | Name | Meaning |
 |---|---|
@@ -29,39 +31,52 @@ List<Point> p = [(0, 0), (1, 0)]
 c = rgb(255, 0, 0)
 ```
 
-`undefined` is an evaluation result rather than a distinct type that can be declared. Operations requiring a valid value propagate undefined unless their documentation says otherwise.
+`undefined` is an evaluation result rather than a distinct declarable type. Operations requiring a valid value propagate `undefined` unless specified otherwise.
 
-### Numbers and constants
+---
+
+### Numbers and Constants
 
 The supported named constants are `\pi`, `\tau`, `\e`, and `\infty` (also spelled `\infinity`).
 
-Numeric literals include integers and decimals, such as `2`, `-4`, and `0.25`. `\e` denotes Euler’s number; it does not make the reserved letter `e` available as a variable name.
+Numeric literals include integers and decimals, such as `2`, `-4`, and `0.25`. `\e` denotes Euler’s number; the single letter `e` is reserved and cannot be used as a variable name.
 
-### Points, polygons, and colors
+---
 
-Points use `(x, y)` or `(x, y, z)`; coordinate access uses `.x`, `.y`, and, for 3D points, `.z`. Polygons expose an ordered `.vertices` list of 2D points. To construct a polygon, use the syntax polygon((x1,y1), (x2, y2))
+### Points, Polygons, and Colors
 
-Color constructors are supported, but their component ranges have not been specified. Use the target Desmos implementation’s ranges and conventions for `rgb`, `hsv`, `okhsv`, `oklab`, and `oklch`.
+- **Points**: Defined as `(x, y)` for 2D or `(x, y, z)` for 3D. Coordinate access uses `.x`, `.y`, and `.z`.
+- **Polygons**: Vertices can be retrieved via the `.vertices` property, which returns a `List<Point>` of 2D points. Polygons can be constructed using any of the following signatures:
+  - Sequence of point arguments: `polygon((x_1, y_1), (x_2, y_2), ...)`
+  - Single list of points: `polygon([(x_1, y_1), (x_2, y_2), ...])`
+  - Two parallel coordinate lists: `polygon([x_1, x_2, ...], [y_1, y_2, ...])`
+- **Colors**: Component ranges and conventions follow the target Desmos implementation for `rgb(...)`, `hsv(...)`, `okhsv(...)`, `oklab(...)`, and `oklch(...)`.
 
-## 2. Names, declarations, and scope
+---
 
-A variable name consists of **one letter** other than `x`, `y`, or `e`. It may have a subscript of any length containing only letters and digits. The listed Greek letters are also permitted as variable names, but not as subscripts; the list of permitted Greek letters still needs to be supplied.
+## 2. Names, Declarations, and Scope
 
-In plain-text source, `a_index1` represents a subscripted name. Thus `a`, `b`, and `a_index1` are valid names, while `totalForce` is not a variable name.
+### Variable Naming
+- A variable name consists of **one letter** other than `x`, `y`, or `e`.
+- A variable name may have a subscript of any length containing only letters and digits (e.g., `a_index1`).
+- Greek letters are permitted as base variable names, but not as subscripts (**Needs review**: the complete list of permitted Greek letters needs to be supplied).
+- Full-word names like `totalForce` are not valid variable names.
+- Inline variables may contain letters without subscripts, but their first character cannot be a digit.
 
-Inline variables may contain letters without subscripts but may not contain a digit as its first character
-
-A variable can be declared with `name = expression` or `Type name = expression`. The `inline` modifier requests direct substitution at each use:
+### Declarations
+A variable can be declared with `name = expression` or `Type name = expression`. The `inline` modifier requests direct substitution at each call site:
 
 ```text
 inline Number r = distance(p_1, p_2)
 ```
 
-`inline` affects compilation, not the value or scope of `r`; its expression must still be valid everywhere it is substituted.
+`inline` affects compilation, not value or scope; its expression must be valid at every site where it is substituted.
 
-### Local declarations (“with” expressions)
+---
 
-A parenthesized, multiline expression may declare variables and finish with a value:
+### Local Declarations (“With” Expressions)
+
+A parenthesized, multiline block may declare local variables and conclude with a result expression:
 
 ```text
 (
@@ -71,123 +86,151 @@ A parenthesized, multiline expression may declare variables and finish with a va
 )
 ```
 
-Variables declared **inside** such an expression cannot depend on other variables declared at the same level:
-
-```text
-# Invalid: b depends on a declared in the same local scope.
-(
+- **No intra-scope dependencies**: Variables declared *inside* a local block cannot depend on sibling variables declared in that same local scope:
+  ```text
+  # Invalid: b depends on a declared in the same local scope
+  (
+    a = 1
+    b = a + 1
+    a + b
+  )
+  ```
+- **Top-level dependencies**: Top-level declarations *can* depend on prior top-level declarations:
+  ```text
   a = 1
   b = a + 1
   a + b
-)
-```
+  ```
+- **Enclosing scope dependencies**: A local variable may depend on variables from an enclosing top-level scope:
+  ```text
+  a = 1
+  (
+    b = a + 1
+    a + b
+  )
+  ```
+- Local declaration scopes cannot be nested. Function parameters and loop iteration variables act as inputs to a local scope rather than declarations, meaning local expressions may reference function arguments or iteration variables directly.
 
-Dependencies between locally declared variables are allowed at the top level:
+---
+
+### Execution Model and Fault Tolerance
+
+Statements in a document are evaluated with independent error isolation. A runtime or evaluation error on one line does not halt or invalidate independent lines before or after it:
 
 ```text
-a = 1
-b = a + 1
-a + b
+error_line
+ok_line     # Executes successfully despite surrounding errors
+error_line
 ```
 
-A local variable may also depend on a variable from an enclosing top-level scope:
+> **Needs review**: Confirm whether this line-level fault tolerance applies solely to separate top-level expression lines in the workbook environment or whether it extends to multi-line sub-expressions and local blocks.
 
-```text
-a = 1
-(
-  b = a + 1
-  a + b
-)
-```
+---
 
-Local declaration scopes cannot nest. This also applies inside a function: a variable declared in the function’s local expression cannot depend on another declaration in that same expression.
+## 3. Expressions and Operators
 
-Function parameters and iteration variables are inputs to a local scope, rather than local declarations for this dependency rule. This permits a local definition to use its function parameter or loop iterator.
-
-## 3. Expressions and operators
-
-### Numeric operations
+### Numeric and Comparison Operations
 
 | Syntax | Meaning |
 |---|---|
 | `a + b`, `a - b` | Addition, subtraction |
 | `a * b`, `a \times b`, `a(b)` | Multiplication |
 | `a / b`, `\frac{a}{b}` | Division |
-| `a \cross b` | Cross-product-style operation; its supported operand types need specification |
 | `a^b`, `a^{b}` | Exponentiation |
-| `a!` | Factorial |
-| `a % b` | Remainder |
+| `a!` | Factorial (numeric types only) |
+| `a % b` | Remainder / modulo |
+| `<`, `<=`, `>`, `>=` | Relational comparisons |
+| `=`, `==` | Equality comparison (both forms are supported) |
+| `and`, `or` | Logical conjunction and disjunction |
 
-Comparisons use `<`, `<=`, `>`, `>=`, `=`, or `==`; logical conditions use `and` and `or`. Assignment `=` is distinguished from comparison `=` by context.
+- **Logical NOT**: The `not` operator is **not supported**. Conditions must be expressed using inverted comparison operators.
+- **Factorials**: The factorial operator `!` is strictly numeric; applying `!` to a `Point` or other non-numeric type produces an evaluation error.
+- Standard mathematical operator precedence applies.
 
-Standard mathematical precedence applies: parentheses; factorial; powers; unary signs; multiplication/division/remainder; addition/subtraction; comparisons; logical operators. Parenthesize expressions whose interpretation matters.
+---
 
-### Point operations
+### Point Operations
 
-The example uses point subtraction, point addition, multiplication by a number, and summation of point values:
+- **Addition and Subtraction**: `p_1 + p_2` and `p_1 - p_2` perform coordinate-wise operations on points of matching dimension (2D with 2D, 3D with 3D).
+- **Scalar Multiplication and Division**: `p * s` and `p / s` multiply or divide each coordinate by the scalar value `s`.
+- **Cross Product (`\cross`)**:
+  - `Point3D \cross Point3D`: Supported; computes the 3D vector cross product and yields a 3D `Point`.
+  - `Point2D \cross Point2D`: **Not supported**; results in an evaluation error.
+  - `Point2D \cross Number`: Supported; behaves identically to a dot product (**Needs review**: clarify mathematical semantics; a dot product typically pairs two vectors rather than a vector and a scalar. Clarify whether this operation projects or scales coordinates).
+  - `Point3D \cross Number`: **Not supported**; results in an evaluation error.
+
+---
+
+### List Operations
+
+Binary operations on lists are applied element-wise:
 
 ```text
-p_1 - p_2
-p_1 + p_2
-p_1 * 0.5
+[a, b] + [c, d]  # [a + c, b + d]
+[a, b] * c       # [a * c, b * c]
 ```
 
-These are coordinate-wise operations on points of matching dimension. Division of a point by a nonzero number is also coordinate-wise. Other point operations, including `\cross`, require an explicit definition before use.
+- When operating on two lists of unequal length, the result is truncated to the length of the shorter list.
 
-### List operations
+---
 
-For a binary operator supported by the element type, a list operation is element-wise:
+### Piecewise Expressions and Conditions
 
-```text
-[a, b] + [c, d]  # [a+c, b+d]
-[a, b] * c       # [a*c, b*c]
-```
-
-Operations between two lists of different lengths will trim the list to the shortest length.
-
-### Piecewise expressions and conditions
-
-A piecewise expression tests conditions from left to right and returns the first matching value:
+Piecewise expressions evaluate conditions from left to right:
 
 ```text
 {condition_1: value_1, condition_2: value_2, default_value}
 ```
 
-Without a default, it returns undefined when no condition matches. All branch values must have the same type, except for any exceptions that are to be specified.
-
-The equivalent statement-style form is:
+Equivalent block and ternary syntaxes:
 
 ```text
+# Statement / Block style
 if condition_1:
   value_1
 else if condition_2:
   value_2
 else:
   default_value
-```
 
-`elif` is an alias for `else if`. Ternary forms are also supported:
-
-```text
+# Ternary styles
 value_if_true if condition else value_if_false
 condition ? value_if_true : value_if_false
 ```
 
-Conditions yield truth values usable by piecewise expressions; boolean values are not otherwise a declared data type. The same branch-type rule applies to all three forms.
+- **Type Consistency Exception**: All branches must evaluate to the same data type, with one exception: **`undefined` is compatible with any type** and may appear as an alternative branch value.
+- **Evaluation Semantics**: All branches in a piecewise expression are evaluated concurrently (**Needs review**: clarify whether non-selected branches with runtime errors or undefined values are fully suppressed and ignored, or if certain errors in unselected paths can invalidate the entire expression).
 
-## 4. Lists, indexing, and iteration
+---
 
-A list literal is `[value_1, value_2, ...]`. Every element must have the same type, and lists cannot contain lists.
+### Actions (State Updates)
 
-Indexing uses `list[index]`, starts at **1**, and returns undefined for an out-of-range index. 
+Actions perform state mutations (such as ticker updates or click handlers) using either `->` or `\to`:
 
-Iteration constructs produce lists:
+```text
+variable -> expression
+variable \to expression
+```
+
+Actions update the assigned state variable when an event or action trigger occurs.
+
+---
+
+## 4. Lists, Indexing, and Iteration
+
+- **List Literals**: Defined as `[value_1, value_2, ...]`. Elements must be homogeneous; nested lists are forbidden.
+- **Indexing**: 1-based (`list[1]` is the first element). Out-of-bounds indices evaluate to `undefined`.
+- **Ranges**: `[a...b]` produces an inclusive range from integer `a` to `b`.
+
+### List Comprehensions
+
+List comprehensions produce a single-dimension list:
 
 ```text
 L = i for i = [1...10]
 ```
 
-The block form is equivalent:
+Equivalent block syntax:
 
 ```text
 L = (
@@ -196,28 +239,23 @@ L = (
 )
 ```
 
-`for i = values`, `for i of values`, and `for i in values` are equivalent; parentheses around the iterator clause are allowed, as in `for (i of values)`.
+- Variations: `for i = values`, `for i of values`, and `for i in values` are interchangeable. Parentheses around loop clauses are optional: `for (i of values)`.
+- Typed iterators are supported: `for Point p in points`.
+- Nested loops do **not** flatten and cannot produce lists of lists (which would violate type homogeneity rules).
 
-`[a...b]` is an inclusive integer range, and iterations preserve source order. A typed iterator can be written `for Point p in points`. Each loop body evaluates to one list element.
+---
 
-Nested loops do not flatten into one list. They do not produce a list of lists, which would violate the data-type restriction.
+## 5. Functions and Recursion
 
-`count(list)` returns its number of items; `total(list)` sums numeric elements or adds point elements coordinate-wise. 
-
-## 5. Functions and recursion
-
-Functions are supported, and recursion is limited to 10,000 calls.
-
-Function definitions use a name, parameters, and an expression-valued body:
+Functions are defined with an identifier, parameter list, and an expression body. The final evaluated expression serves as the return value:
 
 ```text
 distanceSquared(p_1, p_2):
   (p_1.x - p_2.x)^2 + (p_1.y - p_2.y)^2
 ```
 
-The last expression is the result; no `return` keyword is required. Parameter and result type annotations are optional.
-
-A function body may use local declarations subject to the scope rules in §2:
+- **Recursion**: Recursive calls are permitted, with a maximum recursion depth limit of **10,000 calls**. Exceeding this limit returns `undefined`.
+- **Local Scopes in Functions**: A function body may use a local declaration block (§2):
 
 ```text
 midpoint(p_1, p_2):
@@ -228,36 +266,110 @@ midpoint(p_1, p_2):
   )
 ```
 
-Here neither `a` nor `b` depends on the other. Exceeding the recursion limit evaluates to undefined.
+---
 
-## 6. Blocks, comments, and source style
+## 6. Built-in Functions and Standard Library
 
-Comments may use `#`, `//`, or `/* ... */`:
+### Elementary, Exponential, and Logarithmic
+
+| Function | Description |
+|---|---|
+| `exp(x)` | Exponential function ($e^x$) |
+| `ln(x)` | Natural logarithm (base $e$) |
+| `log(x)` | Common logarithm (base 10) |
+| `loga(x)` / `\log_{a}(x)` | Logarithm with base $a$ (**Needs review**: verify whether syntax is `loga(x)`, `log(a, x)`, or LaTeX subscript `\log_{a}(x)`) |
+| `ceil(x)`, `floor(x)`, `round(x)` | Ceiling, floor, and round-to-nearest |
+| `sign(x)` | Signum function (-1, 0, or 1) |
+| `mod(a, b)` | Modulo / remainder |
+| `gcd(a, b)`, `lcm(a, b)` | Greatest common divisor, least common multiple |
+| `distance(p_1, p_2)` | Euclidean distance between two points |
+
+---
+
+### Trigonometric and Hyperbolic Functions
+
+- **Direct Trigonometric**: `sin`, `cos`, `tan`, `csc`, `sec`, `cot`
+- **Inverse Trigonometric**: `arcsin` (or `\sin^{-1}`), `arccos` (or `\cos^{-1}`), `arctan` (or `\tan^{-1}`), `arccsc` (or `\csc^{-1}`), `arcsec` (or `\sec^{-1}`), `arccot` (or `\cot^{-1}`)
+- **Hyperbolic**: `sinh`, `cosh`, `tanh`, `csch`, `sech`, `coth`
+
+---
+
+### Calculus and Iterated Operators
+
+| Syntax | Description |
+|---|---|
+| `d/dx f(x)` or `\frac{d}{dx} f(x)` | Derivative with respect to $x$ |
+| `f'(x)` | Prime derivative notation |
+| `\int` or `\integral` | Definite or indefinite integral |
+| `\sum` or `\summation` | Iterated summation over an index range |
+| `\prod` or `\product` | Iterated product over an index range |
+
+---
+
+### Discrete Mathematics and Combinatorics
+
+| Function | Description |
+|---|---|
+| `nPr(n, r)` | Permutations: $\frac{n!}{(n - r)!}$ |
+| `nCr(n, r)` | Combinations: $\frac{n!}{r!(n - r)!}$ |
+| `a!` | Factorial of a non-negative integer |
+
+---
+
+### List Aggregations and Array Operations
+
+- **Aggregations**: `count(L)`, `total(L)`, `mean(L)`, `median(L)`, `min(L)`, `max(L)`, `quartile(L, q)`, `quantile(L, p)`, `stdev(L)`, `stdevp(L)`, `var(L)`, `varp(L)`, `cov(L_1, L_2)`, `covp(L_1, L_2)`, `mad(L)`, `corr(L_1, L_2)`, `spearman(L_1, L_2)`, `stats(L)`
+- **Transformations**: `repeat(item, count)`, `join(L_1, L_2, ...)`, `sort(L)`, `shuffle(L)`, `unique(L)`
+
+---
+
+### Probability Distributions and Simulation
+
+- **Distributions**:
+  - Continuous: `normaldist(...)`, `tdist(...)`, `chisqdist(...)`, `uniformdist(...)`
+  - Discrete: `binomialdist(...)`, `poissondist(...)`, `geodist(...)`, `discretedist(...)`
+- **Distribution Operators**:
+  - `pdf(dist, x)`: Probability density / mass function evaluated at $x$
+  - `cdf(dist, x)`: Cumulative distribution function evaluated at $x$
+  - `inversecdf(dist, p)`: Quantile value for cumulative probability $p$
+  - `random(dist, [n])`: Generates one or $n$ random samples from the distribution
+
+---
+
+### Hypothesis Testing and Statistical Inference
+
+- **Test Constructors**: `ztest(...)`, `ttest(...)`, `zproptest(...)`, `chisqtest(...)`, `chisqgof(...)`
+- **Statistical Results and Properties**:
+  `null`, `p`, `pleft`, `pright`, `score`, `dof`, `stderr`, `conf`, `lower`, `upper`, `estimate`
+  > **Needs review**: Confirm whether these statistical fields are standalone accessor functions (e.g., `p(T)`) or properties accessed directly off the test object (e.g., `T.p`, `T.dof`).
+
+---
+
+### Geometry Transformations
+
+The following geometry-specific transformation functions operate on geometric entities (**Needs review**: confirm supported target types [points, polygons, or curves] and their parameter order):
+
+- `translate(...)`
+- `reflect(...)`
+- `dilate(...)`
+- `rotate(...)`
+
+---
+
+### Audio and Visualizations
+
+- **Plots**: `histogram(...)`, `dotplot(...)`, `boxplot(...)`
+- **Audio Generation**: `tone(frequency)` generates an audio tone at a specified frequency in Hertz.
+
+---
+
+## 7. Comments and Source Style
+
+Comments can be formatted using shell, C-style line, or block delimiters:
 
 ```text
-# One line
-// Another line
-/* Multiple
-   lines */
-```
-
-## Other things
-
-Polygon.vertices returns a List<Point>
-\cross between two points cannot be used on 2d points. It can be used on 3d points
-\cross between a point and number can be used on a 2d point (same as dot) but not a 3d point
-polygons can be constructed like:
-polygon((a,b),(c,d))
-polygon([(a,b),(c,d)])
-polygon([a,c],[b,d])
-You cannot take the Factorial of any point
-Numeric equality can be represented as either = or ==
-Exception to same-type piecewise branch: undefined values can be mixed with any value
-The not operator is not supported
-All paths in a piecewise expression is evaluated at the same time. If an error occurs in a path that is not called, it will not execute
-The ok_line can still execute in this example
-```
-error_line
-ok_line
-error_line
+# Single line comment
+// Alternative single line comment
+/* Multi-line
+   block comment */
 ```
