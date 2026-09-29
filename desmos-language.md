@@ -371,3 +371,13 @@ Comments can be formatted using shell, C-style line, or block delimiters:
 /* Multi-line
    block comment */
 ```
+
+## other things
+
+syntax list[list<x]
+regressions
+tables + actions incompatability
+no implicit `if x` where x is a number
+syntax [0,2...100]
+inline variables can reference other inline variables
+recursive definition triggers an error, eg. a=b, b=a
