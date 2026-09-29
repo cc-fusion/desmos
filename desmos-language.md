@@ -59,8 +59,8 @@ Numeric literals include integers and decimals, such as `2`, `-4`, and `0.25`. `
 ### Variable Naming
 - A variable name consists of **one letter** other than `x`, `y`, or `e`.
 - A variable name may have a subscript of any length containing only letters and digits (e.g., `a_index1`).
-- Greek letters are permitted as base variable names, but not as subscripts (**Needs review**: the complete list of permitted Greek letters needs to be supplied).
-- Full-word names like `totalForce` are not valid variable names.
+# - **Greek letters are permitted as base variable names, but not as subscripts (Needs review: the complete list of permitted Greek letters needs to be supplied).**
+- Full-word names like `variableName` are not valid variable names.
 - Inline variables may contain letters without subscripts, but their first character cannot be a digit.
 
 ### Declarations
@@ -80,9 +80,8 @@ A parenthesized, multiline block may declare local variables and conclude with a
 
 ```text
 (
-  a = 1
-  b = 2
   a + b
+  with a = 1, b = 2
 )
 ```
 
@@ -90,9 +89,8 @@ A parenthesized, multiline block may declare local variables and conclude with a
   ```text
   # Invalid: b depends on a declared in the same local scope
   (
-    a = 1
-    b = a + 1
     a + b
+    with a = 1, b = a + 1
   )
   ```
 - **Top-level dependencies**: Top-level declarations *can* depend on prior top-level declarations:
@@ -105,8 +103,8 @@ A parenthesized, multiline block may declare local variables and conclude with a
   ```text
   a = 1
   (
-    b = a + 1
     a + b
+    with b = a + 1
   )
   ```
 - Local declaration scopes cannot be nested. Function parameters and loop iteration variables act as inputs to a local scope rather than declarations, meaning local expressions may reference function arguments or iteration variables directly.
@@ -123,7 +121,7 @@ ok_line     # Executes successfully despite surrounding errors
 error_line
 ```
 
-> **Needs review**: Confirm whether this line-level fault tolerance applies solely to separate top-level expression lines in the workbook environment or whether it extends to multi-line sub-expressions and local blocks.
+This line-level fault tolerance applies solely to separate top-level expression lines in the workbook environment. It does NOT extend to multi-line sub-expressions and local blocks, where an error causes the whole block to fail.
 
 ---
 
@@ -156,7 +154,7 @@ error_line
 - **Cross Product (`\cross`)**:
   - `Point3D \cross Point3D`: Supported; computes the 3D vector cross product and yields a 3D `Point`.
   - `Point2D \cross Point2D`: **Not supported**; results in an evaluation error.
-  - `Point2D \cross Number`: Supported; behaves identically to a dot product (**Needs review**: clarify mathematical semantics; a dot product typically pairs two vectors rather than a vector and a scalar. Clarify whether this operation projects or scales coordinates).
+  - `Point2D \cross Number`: Supported; behaves identically to multiplication.
   - `Point3D \cross Number`: **Not supported**; results in an evaluation error.
 
 ---
@@ -199,7 +197,7 @@ condition ? value_if_true : value_if_false
 ```
 
 - **Type Consistency Exception**: All branches must evaluate to the same data type, with one exception: **`undefined` is compatible with any type** and may appear as an alternative branch value.
-- **Evaluation Semantics**: All branches in a piecewise expression are evaluated concurrently (**Needs review**: clarify whether non-selected branches with runtime errors or undefined values are fully suppressed and ignored, or if certain errors in unselected paths can invalidate the entire expression).
+- **Evaluation Semantics**: All branches in a piecewise expression are evaluated concurrently. Non-selected branches with runtime errors or undefined values are will invalidate the entire expression.
 
 ---
 
@@ -260,9 +258,9 @@ distanceSquared(p_1, p_2):
 ```text
 midpoint(p_1, p_2):
   (
-    a = (p_1.x + p_2.x) / 2
-    b = (p_1.y + p_2.y) / 2
     (a, b)
+    with a = (p_1.x + p_2.x) / 2,
+    b = (p_1.y + p_2.y) / 2
   )
 ```
 
@@ -277,7 +275,7 @@ midpoint(p_1, p_2):
 | `exp(x)` | Exponential function ($e^x$) |
 | `ln(x)` | Natural logarithm (base $e$) |
 | `log(x)` | Common logarithm (base 10) |
-| `loga(x)` / `\log_{a}(x)` | Logarithm with base $a$ (**Needs review**: verify whether syntax is `loga(x)`, `log(a, x)`, or LaTeX subscript `\log_{a}(x)`) |
+| `loga(x)` / `log_a(x)` / `\log_{a}(x)` | Logarithm with base $a$ |
 | `ceil(x)`, `floor(x)`, `round(x)` | Ceiling, floor, and round-to-nearest |
 | `sign(x)` | Signum function (-1, 0, or 1) |
 | `mod(a, b)` | Modulo / remainder |
@@ -341,13 +339,13 @@ midpoint(p_1, p_2):
 - **Test Constructors**: `ztest(...)`, `ttest(...)`, `zproptest(...)`, `chisqtest(...)`, `chisqgof(...)`
 - **Statistical Results and Properties**:
   `null`, `p`, `pleft`, `pright`, `score`, `dof`, `stderr`, `conf`, `lower`, `upper`, `estimate`
-  > **Needs review**: Confirm whether these statistical fields are standalone accessor functions (e.g., `p(T)`) or properties accessed directly off the test object (e.g., `T.p`, `T.dof`).
+# Needs review: Confirm whether these statistical fields are standalone accessor functions (e.g., `p(T)`) or properties accessed directly off the test object (e.g., `T.p`, `T.dof`).
 
 ---
 
 ### Geometry Transformations
 
-The following geometry-specific transformation functions operate on geometric entities (**Needs review**: confirm supported target types [points, polygons, or curves] and their parameter order):
+The following geometry-specific transformation functions operate on points and polygons
 
 - `translate(...)`
 - `reflect(...)`
