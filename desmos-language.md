@@ -49,6 +49,8 @@ A variable name consists of **one letter** other than `x`, `y`, or `e`. It may h
 
 In plain-text source, `a_index1` represents a subscripted name. Thus `a`, `b`, and `a_index1` are valid names, while `totalForce` is not a variable name.
 
+Inline variables may contain letters without subscripts but may not contain a digit as its first character
+
 A variable can be declared with `name = expression` or `Type name = expression`. The `inline` modifier requests direct substitution at each use:
 
 ```text
@@ -198,16 +200,6 @@ L = (
 
 `[a...b]` is an inclusive integer range, and iterations preserve source order. A typed iterator can be written `for Point p in points`. Each loop body evaluates to one list element.
 
-Nested loops occur in the example:
-
-```text
-[
-  for i in [1...3]:
-    for j in [1...2]:
-      i + j
-]
-```
-
 Nested loops do not flatten into one list. They do not produce a list of lists, which would violate the data-type restriction.
 
 `count(list)` returns its number of items; `total(list)` sums numeric elements or adds point elements coordinate-wise. 
@@ -261,3 +253,11 @@ polygon([a,c],[b,d])
 You cannot take the Factorial of any point
 Numeric equality can be represented as either = or ==
 Exception to same-type piecewise branch: undefined values can be mixed with any value
+The not operator is not supported
+All paths in a piecewise expression is evaluated at the same time. If an error occurs in a path that is not called, it will not execute
+The ok_line can still execute in this example
+```
+error_line
+ok_line
+error_line
+```
