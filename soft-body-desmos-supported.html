@@ -1,0 +1,419 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Soft body simulation</title>
+  <style>
+    canvas {
+      aspect-ratio: 1/1;
+      max-width: 100%;
+      max-height: 100%;
+      width: 100%;
+      background-color: #ffffff;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    let internalSize = 2000
+    canvas.width = internalSize
+    canvas.height = internalSize
+    let ctx = canvas.getContext("2d")
+
+    // Constants
+
+    const BOUNCINESS = 0.2
+    const GRAVITY = 2
+    const STIFFNESS = 0.9
+    const WALLFRICTION = 1.2
+    const AIRFRICTION = 1
+    const DAMPING = 0.2
+
+    // Helper functions
+
+    function distance(a, b, c, d) {
+      if (typeof a == "object") {
+        return distance(a.x, a.y, b.x, b.y)
+      } else {
+        return Math.sqrt((a-c)**2+(b-d)**2)
+      }
+    }
+    function getCenter(pts) {
+      let center = new Vector2(0,0)
+      
+      for (let p of pts) {
+        center.add(p)
+      }
+      return center.multiplyScalar(1/pts.length)
+    }
+    function closestVerticesIdx(pt, polygon, i=0, minLength = 1/0, minIdx = -1) {
+      if (i == polygon.length) return minIdx
+      let idx1 = i
+      let idx2 = (i+1)%polygon.length
+      let currLength = distance(pt, closestPointOnSegment(pt, polygon[idx1], polygon[idx2]))
+      if (currLength < minLength) {
+        minLength = currLength
+        minIdx = i
+      }
+      return closestVerticesIdx(pt, polygon, i + 1, minLength, minIdx)
+    }
+    function closestPointOnSegment(p, a, b) {
+      // magic function that does some linear algebra and somehow doesn't crash
+      let ab = b.copy().subtract(a)
+      let ap = p.copy().subtract(a)
+      let abLenSq = ab.x * ab.x + ab.y * ab.y
+      
+      if (abLenSq === 0) return a.copy()
+
+      // Project ap onto ab, clamped between 0 and 1
+      let t = clamp((ap.x * ab.x + ap.y * ab.y) / abLenSq, 0, 1)
+      return a.copy().add(ab.multiplyScalar(t))
+    }
+    function clamp(val, min, max) {
+      return Math.min(Math.max(min, val), max)
+    }
+    function getBoundingBox(polygon) {
+      let vectorMin = new Vector2(1/0,1/0)
+      let vectorMax = new Vector2(-1/0, -1/0)
+      for (let pt of polygon) {
+        if (pt.x < vectorMin.x) vectorMin.x = pt.x
+        if (pt.y < vectorMin.y) vectorMin.y = pt.y
+        if (pt.x > vectorMax.x) vectorMax.x = pt.x
+        if (pt.y > vectorMax.y) vectorMax.y = pt.y
+      }
+      return {
+        min: vectorMin,
+        max: vectorMax
+      }
+    }
+    function collisionAABB(boxA, boxB) {
+      let minA = boxA.min
+      let maxA = boxA.max
+      let minB = boxB.min
+      let maxB = boxB.max
+      return minA.x <= maxB.x &&
+      maxA.x >= minB.x &&
+      minA.y <= maxB.y &&
+      maxA.y >= minB.y
+    }
+
+    // Spring calculations
+    function computeSpringForce(pos, target, stiffness) {
+      // F = -kx
+      return pos.copy().subtract(target).multiplyScalar(-stiffness) // -4 lines with vectors!
+    }
+    function computeSpringDamping(vel, relativeVel, damping) {
+      return vel.copy().subtract(relativeVel).multiplyScalar(damping)
+    }
+
+    // Raycasting + point-in-polygon
+
+    function raycastHoriz0(x1, y1, x2, y2) {
+      // check if line segment (x1, y1, x2, y2) intersects y=0 for x>=0
+      if ((y1 > 0) === (y2 > 0)) return false // y1 and y2 must not be on the same side of the y=0 axis
+      
+      let intersection = x1 - y1 * (x2 - x1)/(y2 - y1) // this also works for edge cases where y1 or y2 is on one of the points
+      return intersection >= 0
+    }
+    function raycastHoriz(a, b, x1, y1, x2, y2) {
+      return raycastHoriz0(x1-a, y1-b, x2-a, y2-b)
+    }
+    function ptInPolygon(pt, polygon) {
+      // odd intersections: true, even: false
+      let intersections = 0
+      for (let i = 0; i < polygon.length; i++) {
+        let idx1 = i
+        let idx2 = (i+1)%polygon.length
+        intersections += raycastHoriz(pt.x, pt.y, polygon[idx1].x, polygon[idx1].y, polygon[idx2].x, polygon[idx2].y)
+      }
+      return intersections % 2 == 1
+    }
+
+    // Vectors
+
+    class Vector2 {
+      constructor(x, y) {this.x = x;this.y = y}
+      add(otherVec) {this.x += otherVec.x;this.y += otherVec.y;return this}
+      subtract(otherVec) {this.x -= otherVec.x;this.y -= otherVec.y;return this}
+      multiplyScalar(num) {this.x *= num;this.y *= num;return this}
+      dot(other) {return this.x * other.x + this.y * other.y;return this}
+      cross(other) {return this.x * other.y + this.y * other.x;return this}
+      norm() {
+        let dist = this.magnitude
+        if (dist == 0) return this // return 0 vector
+        this.x /= dist;this.y /= dist
+        return this
+      }
+      get magnitude() {
+        return Math.sqrt(this.x**2 + this.y**2)
+      }
+      get direction() {
+        return Math.atan2(this.y, this.x)
+      }
+      rotateBy(theta, center={x:0,y:0}) {
+        let cos = Math.cos(theta)
+        let sin = Math.sin(theta)
+        let newX = (this.x-center.x)*cos - (this.y-center.y)*sin + center.x
+        this.y = (this.x-center.x)*sin + (this.y-center.y)*cos + center.y
+        this.x = newX
+        return this
+      }
+      rotateTo(theta, center={x:0,y:0}) {
+        return this.rotateBy(theta - this.direction, center)
+      }
+      copy() {return new Vector2(this.x, this.y)}
+    }
+
+    // Soft body
+
+    class SoftBody {
+      static ID = 1
+      constructor(pos, velX=0, velY=0) {
+        this.UUID = SoftBody.ID
+        SoftBody.ID++
+        this.initPos = []
+        for (let p of pos) {
+          this.initPos.push(new Vector2(p.x, p.y))
+        }
+        this.initCenter = getCenter(pos)
+        this.prevCenter = this.initCenter
+        
+        this.pos = pos
+        this.vel = []
+        for (let p of pos) {
+          this.vel.push(new Vector2(velX,velY))
+        }
+        this.DEBUG_targetPos=[]
+      }
+    }
+
+    // Input
+    let mouse = {x: 0, y: 0, down: false}
+    function initListeners() {
+      let rect = canvas.getBoundingClientRect()
+      addEventListener("mousedown", (e) => {
+        mouse.x = (e.clientX - rect.x) / rect.width * canvas.width
+        mouse.y = (e.clientY - rect.y) / rect.height * canvas.height
+        mouse.down = true
+        place()
+      })
+      addEventListener("mouseup", (e) => {
+        mouse.down = false
+      })
+      addEventListener("mousemove", (e) => {
+        mouse.x = (e.clientX - rect.x) / rect.width * canvas.width
+        mouse.y = (e.clientY - rect.y) / rect.height * canvas.height
+      })
+    }
+    function place() {
+      bodies.push(new SoftBody(circle(mouse.x, mouse.y, Math.random()*100+100, 20)))
+    }
+
+    // Animation
+
+    function update() {
+      for (let body of bodies) {
+        let currPos = body.pos
+        let currVel = body.vel
+
+        for (let j = 0; j < currPos.length; j++) {
+          let posPt = currPos[j]
+          let velPt = currPos[j]//////////
+          this.vel[i].y += GRAVITY
+          let updated = pos.copy().add(vel)
+          if (updated.x < 0) {
+            pos.x = 0
+            vel.x *= -BOUNCINESS
+            vel.y /= WALLFRICTION
+          } else if (updated.x > canvas.width) {
+            pos.x = canvas.width
+            vel.x *= -BOUNCINESS
+            vel.y /= WALLFRICTION
+          } else {
+            pos.x = updated.x
+          }
+          if (updated.y < 0) {
+            pos.y = 0
+            vel.y *= -BOUNCINESS
+            vel.x /= WALLFRICTION
+          } else if (updated.y > canvas.height) {
+            pos.y = canvas.height
+            vel.y *= -BOUNCINESS
+            vel.x /= WALLFRICTION
+          } else {
+            pos.y = updated.y
+          }
+          
+          vel.multiplyScalar(1/AIRFRICTION)
+        }
+
+        let center = getCenter(this.pos)
+
+        // START magic thing that actually works and doesn't explode
+        let a1 = 0
+        let a2 = 0
+        for (let i = 0; i < this.pos.length; i++) {
+          let px = this.pos[i].x - center.x
+          let py = this.pos[i].y - center.y
+          let qx = this.initPos[i].x - this.initCenter.x
+          let qy = this.initPos[i].y - this.initCenter.y
+
+          a1 += py * qx - px * qy
+          a2 += px * qx + py * qy // hey, this looks like one of the vector multiplication things! (TODO: change to vector)
+        }
+        
+        let optimalRotation = Math.atan2(a1, a2)
+        // END magic thing that actually works and doesn't explode
+
+        let centerVel = center.copy().subtract(this.prevCenter)
+        for (let i = 0; i < this.pos.length; i++) {
+          let pos = this.pos[i]
+          let vel = this.vel[i]
+          let initPos = this.initPos[i]
+          let targetPos = initPos.copy().rotateBy(optimalRotation, this.initCenter).add(center).subtract(this.initCenter) // TODO: isn't this just centerVel?
+
+          this.DEBUG_targetPos[i] = targetPos
+          // create a spring between the target position and current point
+          let springForce = computeSpringForce(pos, targetPos, STIFFNESS)
+          let springDamping = computeSpringDamping(vel, centerVel, DAMPING)
+          vel.add(springForce).subtract(springDamping)
+        }
+        this.prevCenter = centerVel
+
+        let thisBoundingBox = getBoundingBox(this.pos)
+        for (let otherBody of bodies) {
+          if (otherBody.UUID == this.UUID) continue
+          
+          let otherPos = otherBody.pos
+          let otherVel = otherBody.vel
+
+          let otherBoundingBox = getBoundingBox(otherPos)
+          if (!collisionAABB(thisBoundingBox, otherBoundingBox)) continue
+
+          for (let i = 0; i < this.pos.length; i++) {
+            let pos = this.pos[i]
+
+            if (ptInPolygon(pos, otherPos)) {
+              let verticesIdx = closestVerticesIdx(pos, otherPos)
+              let vertex1Pos = otherPos[verticesIdx]
+              let vertex1Vel = otherVel[verticesIdx]
+              let vertex2Pos = otherPos[(verticesIdx+1)%otherPos.length]
+              let vertex2Vel = otherVel[(verticesIdx+1)%otherVel.length]
+
+              let closestPoint = closestPointOnSegment(pos, vertex1Pos, vertex2Pos)
+              
+              let vertexLength = distance(vertex1Pos, vertex2Pos)
+
+              let distanceRatio = vertexLength == 0 ? 0.5 : distance(vertex1Pos, closestPoint)/vertexLength
+
+              let penetrationDepth = distance(closestPoint, pos)
+
+              // vector from intersecting point to closest point to surface
+
+              let pointToSegmentForceVec = pos.copy().subtract(closestPoint)
+
+              this.vel[i].subtract(pointToSegmentForceVec)
+              vertex1Vel.add(pointToSegmentForceVec.copy().multiplyScalar(1-distanceRatio))
+              vertex2Vel.add(pointToSegmentForceVec.copy().multiplyScalar(distanceRatio))
+
+              pointToSegmentForceVec.norm().multiplyScalar(penetrationDepth * 0.5)
+
+              this.pos[i].subtract(pointToSegmentForceVec)
+              vertex1Pos.add(pointToSegmentForceVec.copy().multiplyScalar(distanceRatio))
+              vertex2Pos.add(pointToSegmentForceVec.copy().multiplyScalar(1-distanceRatio))
+            }
+          }
+          
+        }
+        */
+      }
+    }
+    let drawDebug = false
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      for (let body of bodies) {
+        ctx.strokeStyle = "#000"
+        ctx.fillStyle = "#f00"
+        ctx.lineWidth = 5
+
+        ctx.beginPath()
+        ctx.moveTo(body.pos[0].x, body.pos[0].y)
+        body.pos.forEach(p => ctx.lineTo(p.x, p.y))
+        ctx.lineTo(body.pos[0].x, body.pos[0].y)
+        ctx.stroke()
+
+        if (drawDebug) {
+          for (let i = 0; i < body.pos.length; i++) {
+            // spring from target pos to actual pos
+            ctx.strokeStyle = "#99f"
+            ctx.lineWidth=3
+            ctx.beginPath()
+            ctx.moveTo(body.DEBUG_targetPos[i].x, body.DEBUG_targetPos[i].y)
+            ctx.lineTo(body.pos[i].x, body.pos[i].y)
+            ctx.stroke()
+
+            // debug pts
+            ctx.fillStyle = "#99f"
+            ctx.beginPath()
+            ctx.arc(body.DEBUG_targetPos[i].x, body.DEBUG_targetPos[i].y, 10, 0, 6.29)
+            ctx.fill()
+
+            // actual pts
+            ctx.fillStyle = "#000"
+            ctx.beginPath()
+            ctx.arc(body.pos[i].x, body.pos[i].y, 10, 0, 6.29)
+            ctx.fill()
+          }
+        } else {
+          ctx.beginPath()
+          ctx.moveTo(body.pos[0].x, body.pos[0].y)
+          for (let i = 0; i < body.pos.length; i++) {
+            ctx.lineTo(body.pos[i].x, body.pos[i].y)
+          }
+          ctx.lineTo(body.pos[0].x, body.pos[0].y)
+          ctx.fill()
+        }
+      }
+    }
+
+    // Initialization
+
+    function init() {
+      initListeners()
+    }
+    function circle(x,y, radius, numpts) {
+      let points = []
+      for (let i = 0; i < numpts; i++) {
+        let theta = i/numpts*Math.PI*2
+        points.push(new Vector2(
+          x+Math.cos(theta)*radius,
+          y+Math.sin(theta)*radius
+        ))
+      }
+      return points
+    }
+
+    let bodies = []
+    
+    // Main loop
+    
+    let lastDraw = 0
+    let frameRate = 60
+    function animate() {
+      if (Date.now() - lastDraw < 1000/frameRate) {
+        requestAnimationFrame(animate)
+        return
+      }
+      update()
+      render()
+      lastDraw = Date.now()
+      requestAnimationFrame(animate)
+    }
+    init()
+    requestAnimationFrame(animate)
+  </script>
+</body>
+
+</html>
