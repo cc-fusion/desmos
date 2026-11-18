@@ -139,12 +139,25 @@
       }
       update() {
         if (this.stopped) return
-        let predictionRaw = this.brain.predict([this.pos.x, this.pos.y, goal.pos.x, goal.pos.y])
+        let predictionRaw = this.brain.predict([this.pos.x, this.pos.y])
         let prediction = {
           movement: new Vector2(predictionRaw[0], predictionRaw[1]).norm().multiplyScalar(CONFIG.agentSpeed)
         }
         this.pos.add(prediction.movement)
-        this.pos.clamp(new Vector2(this.radius, this.radius), new Vector2(1-this.radius, 1-this.radius))
+        // this.pos.clamp(new Vector2(this.radius, this.radius), new Vector2(1-this.radius, 1-this.radius))
+        let hitWall = this.pos.x < 0 || this.pos.x > 1 || this.pos.y < 0 || this.pos.y > 1
+        for (let wall of walls) {
+          let wallLeft = wall.x-wall.xs/2
+          let wallRight = wall.x+wall.xs/2
+          let wallTop = wall.y-wall.ys/2
+          let wallBottom = wall.y+wall.ys/2
+
+          hitWall = hitWall || (wallLeft < this.pos.x && this.pos.x < wallRight && wallTop < this.pos.y && this.pos.y < wallBottom)
+        }
+        if (hitWall) {
+          this.score += CONFIG.rewards.wallReward
+          this.stopped = true
+        }
         if (this.hasReachedGoal()) {
           this.score += CONFIG.rewards.goal
           this.score += CONFIG.rewards.timeReward * time
@@ -202,20 +215,26 @@
         ctx.arc(agent.pos.x*renderSize, agent.pos.y*renderSize, agent.radius*renderSize, 0, 6.29)
         ctx.fill()
       }
+
+      ctx.fillStyle = "#000000"
+      ctx.globalAlpha = 0.9
+      for (let wall of walls) {
+        ctx.fillRect((wall.x - wall.xs/2) * renderSize, (wall.y - wall.ys/2) * renderSize, wall.xs * renderSize, wall.ys * renderSize)
+      }
     }
     let agents = []
     let goal = {
-      pos: new Vector2(Math.random(), Math.random()),
+      pos: new Vector2(0.9, 0.5),
       radius: 0.05,
     }
     let time = 0
     let CONFIG = {
-      startingPos: new Vector2(Math.random(), Math.random()),
-      neuralNetworkSize: [4,10,10,10,10,2],
-      trainingTime: 40,
+      startingPos: new Vector2(0.05, 0.5),
+      neuralNetworkSize: [2,10,10,10,10,2],
+      trainingTime: 60,
       agentCount: 500,
       fps: 60,
-      agentSpeed: 0.03,
+      agentSpeed: 0.02,
       rewards: {
         goal: 1000000,
         maxDistanceReward: 1,
@@ -223,9 +242,13 @@
         endMaxDistanceReward: 10,
         endDistanceReward: 1,
         timeReward: 100,
+        wallReward: -100
       },
       substeps: 1,
     }
+    let walls = [
+      {x: 0.5, y: 0.5, xs: 0.1, ys: 0.3}
+    ]
     for (let i = 0; i < CONFIG.agentCount; i++) {
       agents.push(new Agent(CONFIG.startingPos.copy()))
     }
@@ -252,15 +275,13 @@
             let agent = new Agent(CONFIG.startingPos.copy())
             for (let agentVal of agentDistribution) {
               if (random < agentVal.score) {
-                agent.brain = agentVal.brain.copy().mutate(0.2, 0.1)
+                agent.brain = agentVal.brain.copy().mutate(0.2, 0.05)
                 break
               }
             }
             agents.push(agent)
           }
           time = 0
-          goal.pos = new Vector2(Math.random(), Math.random())
-          CONFIG.startingPos = new Vector2(Math.random(), Math.random())
           nextRenderTime = Date.now() + 1
         } else {
           nextRenderTime = Date.now() + 1000/CONFIG.fps
