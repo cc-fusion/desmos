@@ -70,7 +70,6 @@
         return this
       }
     }
-
     class Layer {
       constructor(inputsCount, outputsCount) {
         this.neurons = []
@@ -99,7 +98,6 @@
         return this
       }
     }
-
     class NeuralNetwork {
       constructor(shape) {
         this.shape = shape || []
@@ -135,12 +133,29 @@
       constructor (pos) {
         this.pos = pos
         this.radius = 0.01
+        this.brain = new NeuralNetwork(CONFIG.neuralNetworkSize)
+        this.score = 0
+        this.stopped = false
       }
       update() {
-        this.pos.clamp(new Vector2(this.radius,this.radius),new Vector2(1-this.radius,1-this.radius))
+        if (this.stopped) return
+        let predictionRaw = this.brain.predict(this.pos.x, this.pos.y)
+        let prediction = {
+          movement: new Vector2(predictionRaw[0], predictionRaw[1]).norm().multiplyScalar(CONFIG.agentSpeed)
+        }
+        this.pos.add(prediction.movement)
+        this.pos.clamp(new Vector2(this.radius, this.radius), new Vector2(1-this.radius, 1-this.radius))
+        if (this.hasReachedGoal()) {
+          this.score += CONFIG.rewards.goal
+          this.stopped = true
+        }
+        this.score += CONFIG.rewards.distanceReward/(distance(this.pos, goal.pos) + CONFIG.rewards.distanceReward/CONFIG.rewards.maxDistanceReward)
       }
       hasReachedGoal() {
         return distance(this.pos, goal.pos) < this.radius+goal.radius
+      }
+      updateEnd() {
+        this.score += CONFIG.rewards.endDistanceReward/(distance(this.pos, goal.pos) + CONFIG.rewards.endDistanceReward/CONFIG.rewards.endMaxDistanceReward)
       }
     }
     function distance() {
@@ -185,17 +200,56 @@
         ctx.fill()
       }
     }
-    let agents = [
-      new Agent(new Vector2(0.05, 0.5))
-    ]
+    let agents = []
     let goal = {
       pos: new Vector2(0.9, 0.5),
       radius: 0.05,
     }
     let time = 0
+    let CONFIG = {
+      startingPos: new Vector2(0.05, 0.5),
+      neuralNetworkSize: [2,4,4,2],
+      trainingTime: 20,
+      agentCount: 10,
+      fps: 60,
+      agentSpeed: 0.01,
+      rewards: {
+        goal: 1000000,
+        maxDistanceReward: 1,
+        distanceReward: 0.1,
+        endMaxDistanceReward: 10,
+        endDistanceReward: 1,
+      },
+    }
+    for (let i = 0; i < CONFIG.agentCount; i++) {
+      agents.push(new Agent(CONFIG.startingPos))
+    }
+    let nextRenderTime = 0
     function animate() {
+      if (Date.now() < nextRenderTime) {
+        requestAnimationFrame(animate)
+        return
+      }
       update()
       time++
+      if (time > CONFIG.trainingTime) {
+        for (let agent of agents) agent.updateEnd()
+        // TODO: change to probability distribution
+        let bestAgent = {score:-1/0}
+        for (let agent of agents) {
+          if (agent.score > bestAgent.score) bestAgent = agent
+        }
+        agents = []
+        for (let i = 0; i < CONFIG.agentCount; i++) {
+          let agent = new Agent(CONFIG.startingPos)
+          agent.brain = bestAgent.brain.copy().mutate(0.2, 0.5)
+          agents.push(agent)
+        }
+        time = 0
+        nextRenderTime = Date.now() + 1
+      } else {
+        nextRenderTime = Date.now() + 1000/CONFIG.fps
+      }
       requestAnimationFrame(animate)
     }
     requestAnimationFrame(animate)
