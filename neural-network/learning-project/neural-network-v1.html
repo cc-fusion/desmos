@@ -139,7 +139,7 @@
       }
       update() {
         if (this.stopped) return
-        let predictionRaw = this.brain.predict([this.pos.x, this.pos.y])
+        let predictionRaw = this.brain.predict([this.pos.x, this.pos.y, goal.pos.x, goal.pos.y])
         let prediction = {
           movement: new Vector2(predictionRaw[0], predictionRaw[1]).norm().multiplyScalar(CONFIG.agentSpeed)
         }
@@ -147,6 +147,7 @@
         this.pos.clamp(new Vector2(this.radius, this.radius), new Vector2(1-this.radius, 1-this.radius))
         if (this.hasReachedGoal()) {
           this.score += CONFIG.rewards.goal
+          this.score += CONFIG.rewards.timeReward * time
           this.stopped = true
         }
         this.score += CONFIG.rewards.distanceReward/(distance(this.pos, goal.pos) + CONFIG.rewards.distanceReward/CONFIG.rewards.maxDistanceReward)
@@ -158,6 +159,7 @@
         this.score += CONFIG.rewards.endDistanceReward/(distance(this.pos, goal.pos) + CONFIG.rewards.endDistanceReward/CONFIG.rewards.endMaxDistanceReward)
       }
     }
+
     function distance() {
       let arg1 = arguments[0]
       let arg2 = arguments[1]
@@ -173,6 +175,7 @@
       }
       throw "Unknown input types to function `distance`"
     }
+
     class Vector2 {
       constructor(x,y) {this.x=x;this.y=y}
       add(other) {this.x+=other.x;this.y+=other.y;return this}
@@ -202,24 +205,26 @@
     }
     let agents = []
     let goal = {
-      pos: new Vector2(0.9, 0.5),
+      pos: new Vector2(Math.random(), Math.random()),
       radius: 0.05,
     }
     let time = 0
     let CONFIG = {
-      startingPos: new Vector2(0.05, 0.5),
-      neuralNetworkSize: [2,10,10,2],
-      trainingTime: 100,
-      agentCount: 50,
+      startingPos: new Vector2(Math.random(), Math.random()),
+      neuralNetworkSize: [4,10,10,10,10,2],
+      trainingTime: 40,
+      agentCount: 500,
       fps: 60,
-      agentSpeed: 0.01,
+      agentSpeed: 0.03,
       rewards: {
         goal: 1000000,
         maxDistanceReward: 1,
         distanceReward: 0.1,
         endMaxDistanceReward: 10,
         endDistanceReward: 1,
+        timeReward: 100,
       },
+      substeps: 1,
     }
     for (let i = 0; i < CONFIG.agentCount; i++) {
       agents.push(new Agent(CONFIG.startingPos.copy()))
@@ -230,44 +235,36 @@
         requestAnimationFrame(animate)
         return
       }
-      update()
-      time++
-      if (time > CONFIG.trainingTime) {
-        for (let agent of agents) agent.updateEnd()
-        /*
-        // TODO: change to probability distribution
-        let bestAgent = {score:-1/0}
-        for (let agent of agents) {
-          if (agent.score > bestAgent.score) bestAgent = agent
-        }
-        agents = []
-        for (let i = 0; i < CONFIG.agentCount; i++) {
-          let agent = new Agent(CONFIG.startingPos.copy())
-          agent.brain = bestAgent.brain.copy().mutate(0.2, 0.05)
-          agents.push(agent)
-        }*/
-        let agentDistribution = []
-        let totalScore = 0
-        for (let agent of agents) {
-          totalScore += agent.score
-          agentDistribution.push({score: totalScore, brain: agent.brain})
-        }
-        agents = []
-        for (let i = 0; i < CONFIG.agentCount; i++) {
-          let random = Math.random() * totalScore
-          let agent = new Agent(CONFIG.startingPos.copy())
-          for (let agentVal of agentDistribution) {
-            if (random < agentVal.score) {
-              agent.brain = agentVal.brain.copy().mutate(0.2, 0.05)
-              break
-            }
+      for (let x = 0; x < CONFIG.substeps; x++) {
+        update()
+        time++
+        if (time > CONFIG.trainingTime) {
+          for (let agent of agents) agent.updateEnd()
+          let agentDistribution = []
+          let totalScore = 0
+          for (let agent of agents) {
+            totalScore += agent.score
+            agentDistribution.push({score: totalScore, brain: agent.brain})
           }
-          agents.push(agent)
+          agents = []
+          for (let i = 0; i < CONFIG.agentCount; i++) {
+            let random = Math.random() * totalScore
+            let agent = new Agent(CONFIG.startingPos.copy())
+            for (let agentVal of agentDistribution) {
+              if (random < agentVal.score) {
+                agent.brain = agentVal.brain.copy().mutate(0.2, 0.1)
+                break
+              }
+            }
+            agents.push(agent)
+          }
+          time = 0
+          goal.pos = new Vector2(Math.random(), Math.random())
+          CONFIG.startingPos = new Vector2(Math.random(), Math.random())
+          nextRenderTime = Date.now() + 1
+        } else {
+          nextRenderTime = Date.now() + 1000/CONFIG.fps
         }
-        time = 0
-        nextRenderTime = Date.now() + 1
-      } else {
-        nextRenderTime = Date.now() + 1000/CONFIG.fps
       }
       requestAnimationFrame(animate)
     }
