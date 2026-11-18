@@ -47,6 +47,24 @@
       update() {
         this.pos.clamp(new Vector2(this.radius,this.radius),new Vector2(1-this.radius,1-this.radius))
       }
+      hasReachedGoal() {
+        return distance(this.pos, goal.pos) < this.radius+goal.radius
+      }
+    }
+    function distance() {
+      let arg1 = arguments[0]
+      let arg2 = arguments[1]
+      if (arg1 instanceof Vector2 && arg2 instanceof Vector2) {
+        return arg1.copy().subtract(arg2).magnitude
+      } else if (typeof arg1 === "object" && typeof arg2 === "object" && "x" in arg1 && "y" in arg1 && "x" in arg2 && "y" in arg2) {
+        return Math.hypot(arg1.x-arg2.x, arg1.y-arg2.y)
+      }
+      let arg3 = arguments[2]
+      let arg4 = arguments[3]
+      if (typeof arg1 === "number" && typeof arg2 === "number" && typeof arg3 === "number" && typeof arg4 === "number") {
+        return Math.hypot(arg1-arg3, arg2-arg4)
+      }
+      throw "Unknown input types to function `distance`"
     }
     class Vector2 {
       constructor(x,y) {this.x=x;this.y=y}
@@ -55,7 +73,7 @@
       multiplyScalar(i) {this.x*=i;this.y*=i;return this}
       get magnitude() {return Math.hypot(this.x, this.y)}
       norm() {this.x==0&&this.y==0?this:this.multiplyScalar(1/this.magnitude);return this}
-      copy() {return new Vector(this.x, this.y)}
+      copy() {return new Vector2(this.x, this.y)}
       clamp(min,max) {this.x=Math.min(max.x,Math.max(min.x,this.x));this.y=Math.min(max.y,Math.max(min.y,this.y));return this}
     }
     function update() {
