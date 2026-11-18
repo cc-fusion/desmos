@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #bcf;
+    }
+
+    #canvas {
+      width: 100vmin;
+      height: 100vmin;
+      
+      aspect-ratio: 1 / 1;
+      display: block;
+      background-color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    let canvas = document.getElementById("canvas")
+    let renderSize = 2000
+    canvas.width = renderSize
+    canvas.height = renderSize
+    let ctx = canvas.getContext("2d")
+
+    class Agent {
+      constructor (pos) {
+        this.pos = pos
+        this.radius = 0.01
+      }
+      update() {
+        this.pos.clamp(new Vector2(this.radius,this.radius),new Vector2(1-this.radius,1-this.radius))
+      }
+    }
+    class Vector2 {
+      constructor(x,y) {this.x=x;this.y=y}
+      add(other) {this.x+=other.x;this.y+=other.y;return this}
+      subtract(other) {this.x-=other.x;this.y-=other.y;return this}
+      multiplyScalar(i) {this.x*=i;this.y*=i;return this}
+      get magnitude() {return Math.hypot(this.x, this.y)}
+      norm() {this.x==0&&this.y==0?this:this.multiplyScalar(1/this.magnitude);return this}
+      copy() {return new Vector(this.x, this.y)}
+      clamp(min,max) {this.x=Math.min(max.x,Math.max(min.x,this.x));this.y=Math.min(max.y,Math.max(min.y,this.y));return this}
+    }
+    function update() {
+      ctx.clearRect(0,0,canvas.width,canvas.height)
+      ctx.fillStyle = "#00ff00"
+      ctx.globalAlpha = 0.9
+      ctx.beginPath()
+      ctx.arc(goal.pos.x*renderSize, goal.pos.y*renderSize, goal.radius*renderSize, 0, 6.29)
+      ctx.fill()
+
+      ctx.fillStyle = "#8290b3"
+      ctx.globalAlpha = 0.6
+      for (let agent of agents) {
+        agent.update()
+        ctx.beginPath()
+        ctx.arc(agent.pos.x*renderSize, agent.pos.y*renderSize, agent.radius*renderSize, 0, 6.29)
+        ctx.fill()
+      }
+    }
+    let agents = [
+      new Agent(new Vector2(0.05, 0.5))
+    ]
+    let goal = {
+      pos: new Vector2(0.9, 0.5),
+      radius: 0.05,
+    }
+    let time = 0
+    function animate() {
+      update()
+      time++
+      requestAnimationFrame(animate)
+    }
+    requestAnimationFrame(animate)
+  </script>
+</body>
+</html>
