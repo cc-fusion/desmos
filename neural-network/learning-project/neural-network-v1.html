@@ -39,6 +39,79 @@
     canvas.height = renderSize
     let ctx = canvas.getContext("2d")
 
+    class Neuron {
+      constructor(weightsCount) {
+        this.weights = []
+        for (let i = 0; i < weightsCount || 0; i++) this.weights.push(Math.random()*2-1)
+        this.bias = Math.random()*2-1
+      }
+      activate(inputs) {
+        let sum = this.bias
+        for (let i = 0; i < inputs.length; i++) {
+          sum += inputs[i] * this.weights[i]
+        }
+        return Math.tanh(sum)
+      }
+      copy() {
+        let neuron = new Neuron()
+        neuron.weights = this.weights
+        neuron.bias = this.bias
+        return neuron
+      }
+      mutate(rate, strength) {
+        for (let i = 0; i < this.weights.length; i++) {
+          if (Math.random() < rate) {
+            this.weights[i] += (Math.random*2-1)*strength
+          }
+        }
+      }
+    }
+
+    class Layer {
+      constructor(inputsCount, outputsCount) {
+        this.neurons = []
+        for (let i = 0; i < outputsCount || 0; i++) {
+          this.neurons.push(new Neuron(inputsCount || 0))
+        }
+      }
+      forward(inputs) {
+        let output = []
+        for (let neuron of this.neurons) {
+          output.push(neuron.activate(inputs))
+        }
+        return output
+      }
+      copy() {
+        let layer = new Layer()
+        for (let neuron of neurons) {
+          neuron = neuron.copy()
+        }
+        return layer
+      }
+      mutate() {
+        for (let neuron of neurons) {
+          neuron = neuron.mutate()
+        }
+      }
+    }
+
+    class NeuralNetwork {
+      constructor(shape) {
+        this.shape = shape
+        this.layers = []
+        for (let i = 0; i < shape.length-1; i++) {
+          this.layers.push(new Layer(shape[i], shape[i+1]))
+        }
+      }
+      predict(inputs) {
+        let output = inputs
+        for (let layer of this.layers) {
+          output = layer.forward(output)
+        }
+        return output
+      }
+    }
+
     class Agent {
       constructor (pos) {
         this.pos = pos
