@@ -54,23 +54,27 @@
       }
       copy() {
         let neuron = new Neuron()
-        neuron.weights = this.weights
+        neuron.weights = [...this.weights]
         neuron.bias = this.bias
         return neuron
       }
       mutate(rate, strength) {
         for (let i = 0; i < this.weights.length; i++) {
           if (Math.random() < rate) {
-            this.weights[i] += (Math.random*2-1)*strength
+            this.weights[i] += (Math.random()*2-1)*strength
           }
         }
+        if (Math.random() < rate) {
+          this.bias += (Math.random()*2-1)*strength
+        }
+        return this
       }
     }
 
     class Layer {
       constructor(inputsCount, outputsCount) {
         this.neurons = []
-        for (let i = 0; i < outputsCount || 0; i++) {
+        for (let i = 0; i < (outputsCount || 0); i++) {
           this.neurons.push(new Neuron(inputsCount || 0))
         }
       }
@@ -83,24 +87,25 @@
       }
       copy() {
         let layer = new Layer()
-        for (let neuron of neurons) {
-          neuron = neuron.copy()
+        for (let neuron of this.neurons) {
+          layer.neurons.push(neuron.copy())
         }
         return layer
       }
-      mutate() {
-        for (let neuron of neurons) {
-          neuron = neuron.mutate()
+      mutate(rate, strength) {
+        for (let neuron of this.neurons) {
+          neuron = neuron.mutate(rate, strength)
         }
+        return this
       }
     }
 
     class NeuralNetwork {
       constructor(shape) {
-        this.shape = shape
+        this.shape = shape || []
         this.layers = []
-        for (let i = 0; i < shape.length-1; i++) {
-          this.layers.push(new Layer(shape[i], shape[i+1]))
+        for (let i = 0; i < this.shape.length-1; i++) {
+          this.layers.push(new Layer(this.shape[i], this.shape[i+1]))
         }
       }
       predict(inputs) {
@@ -109,6 +114,20 @@
           output = layer.forward(output)
         }
         return output
+      }
+      copy() {
+        let nn = new NeuralNetwork()
+        nn.shape = [...this.shape]
+        for (let layer of this.layers) {
+          nn.layers.push(layer.copy())
+        }
+        return nn
+      }
+      mutate(rate, strength) {
+        for (let layer of this.layers) {
+          layer.mutate(rate, strength)
+        }
+        return this
       }
     }
 
