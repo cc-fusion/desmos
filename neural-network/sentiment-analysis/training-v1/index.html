@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Document</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 2rem;
+    }
+  </style>
+</head>
+
+<body>
+  <pre id="log"></pre>
+  <script>
+    function log() {
+      document.getElementById("log").innerText += [...arguments].join("\t")
+    }
+    addEventListener("error", (e) => {
+      log(e.message)
+    })
+  </script>
+  <script>
+    (async function() {
+      try {
+        let vocab = await (await fetch("https://raw.githubusercontent.com/cc-fusion/desmos/refs/heads/main/neural-network/sentiment-analysis/vocab-1000.json")).json() // ["word", "word", ....]
+        let trainingData = await (await fetch("https://raw.githubusercontent.com/cc-fusion/desmos/refs/heads/main/neural-network/sentiment-analysis/filtered_margin_0.99_vocab.json")).json() // [{"text": text, "label": positive/negative/neutral/other}]
+        start(vocab, trainingData)
+      } catch(e) {
+        log(e)
+      }
+    })()
+    let CONFIG = {
+      embedding_dim: 8,
+      window_size: 3,
+
+    }
+    function 
+    function start(vocab, trainingData) {
+      let vocabMap = {}
+      for (let i = 0; i < vocab.length; i++) {
+        vocabMap[vocab[i]] = i
+      }
+      let splitTrainingData = []
+      for (let data of trainingData) {
+        if (data.label == "positive" || data.label == "negative") {
+          splitTrainingData.push({
+            "text": data.text.split(" ").map(word => vocabMap[word]),
+            "label": data.label == "positive" ? 1 : 0
+          })
+        }
+      }
+      let embeddings = []
+      for (let i = 0; i < vocab.length; i++) {
+        let randomEmbedding = []
+        for (let j = 0; j < CONFIG.embedding_dim; j++) randomEmbedding.push((Math.random()-0.5)*0.1)
+        embeddings.push(randomEmbedding)
+      }
+    }
+  </script>
+</body>
+
+</html>
