@@ -23,42 +23,91 @@
     })
   </script>
   <script>
-    (async function() {
-      try {
-        let vocab = await (await fetch("https://raw.githubusercontent.com/cc-fusion/desmos/refs/heads/main/neural-network/sentiment-analysis/vocab-1000.json")).json() // ["word", "word", ....]
-        let trainingData = await (await fetch("https://raw.githubusercontent.com/cc-fusion/desmos/refs/heads/main/neural-network/sentiment-analysis/filtered_margin_0.99_vocab.json")).json() // [{"text": text, "label": positive/negative/neutral/other}]
-        start(vocab, trainingData)
-      } catch(e) {
-        log(e)
-      }
-    })()
+    let vocabRaw
+    let trainingDataRaw
+    
     let CONFIG = {
       embedding_dim: 8,
       window_size: 3,
-
+      num_filters: 16,
     }
-    function 
-    function start(vocab, trainingData) {
-      let vocabMap = {}
-      for (let i = 0; i < vocab.length; i++) {
-        vocabMap[vocab[i]] = i
+
+    let vocabMap = {}
+    let vocabLength
+    let embeddings = []
+    let trainingData = []
+    let model
+
+    async function fetchData() {
+      try {
+        vocabRaw = await (await fetch("https://raw.githubusercontent.com/cc-fusion/desmos/refs/heads/main/neural-network/sentiment-analysis/vocab-1000.json")).json() // ["word", "word", ....]
+        trainingDataRaw = await (await fetch("https://raw.githubusercontent.com/cc-fusion/desmos/refs/heads/main/neural-network/sentiment-analysis/filtered_margin_0.99_vocab.json")).json() // [{"text": text, "label": positive/negative/neutral/other}]
+        start()
+      } catch(e) {
+        log(e)
       }
-      let splitTrainingData = []
-      for (let data of trainingData) {
+    }
+
+    class Model {
+      constructor() {
+        this.embeddings = []
+        this.filters = []
+        this.output = {}
+        this.init()
+      }
+      init() {
+        // embeddings
+        for (let i = 0; i < vocabLength; i++) {
+          let randomEmbedding = []
+          for (let j = 0; j < CONFIG.embedding_dim; j++) randomEmbedding.push((Math.random()-0.5)*0.1)
+          this.embeddings.push(randomEmbedding)
+        }
+
+        // filters
+        for (let i = 0; i < CONFIG.num_filters; i++) {
+          let weights = []
+          for (let j = 0; j < CONFIG.window_size; j++) {
+            weights.push([])
+            for (let k = 0; k < CONFIG.embedding_dim; k++) {
+              weights[j].push((Math.random()-0.5) * 0.1)
+            }
+          }
+          this.filters.push({
+            weights: weights,
+            bias: 0,
+          })
+        }
+
+        // output weights
+        this.output.weights = []
+        for (let i = 0; i < CONFIG.num_filters; i++) {
+          this.output.weights.push((Math.random()-0.5) * 0.1)
+        }
+        this.output.bias = 0
+      }
+    }
+
+    function initData() {
+      vocabLength = vocabRaw.length
+      for (let i = 0; i < vocabLength; i++) {
+        vocabMap[vocabRaw[i]] = i
+      }
+      trainingData = []
+      for (let data of trainingDataRaw) {
         if (data.label == "positive" || data.label == "negative") {
-          splitTrainingData.push({
+          trainingData.push({
             "text": data.text.split(" ").map(word => vocabMap[word]),
             "label": data.label == "positive" ? 1 : 0
           })
         }
       }
-      let embeddings = []
-      for (let i = 0; i < vocab.length; i++) {
-        let randomEmbedding = []
-        for (let j = 0; j < CONFIG.embedding_dim; j++) randomEmbedding.push((Math.random()-0.5)*0.1)
-        embeddings.push(randomEmbedding)
-      }
     }
+
+    function start() {
+      initData()
+      model = new Model()
+    }
+    fetchData()
   </script>
 </body>
 
