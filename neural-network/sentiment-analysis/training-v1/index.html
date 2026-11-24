@@ -34,7 +34,6 @@
 
     let vocabMap = {}
     let vocabLength
-    let embeddings = []
     let trainingData = []
     let model
 
@@ -57,9 +56,13 @@
       }
       init() {
         // embeddings
-        for (let i = 0; i < vocabLength; i++) {
+        for (let word in vocabMap) {
           let randomEmbedding = []
-          for (let j = 0; j < CONFIG.embedding_dim; j++) randomEmbedding.push((Math.random()-0.5)*0.1)
+          if (word == "<PAD>") {
+            for (let j = 0; j < CONFIG.embedding_dim; j++) randomEmbedding.push(0)
+          } else {
+            for (let j = 0; j < CONFIG.embedding_dim; j++) randomEmbedding.push((Math.random()-0.5)*0.1)
+          }
           this.embeddings.push(randomEmbedding)
         }
 
@@ -85,13 +88,46 @@
         }
         this.output.bias = 0
       }
+      tokenize(string) {
+        let split = string.split(" ")
+        let result = []
+        for (let word of split) {
+          if (!(word in vocabMap)) throw "ERROR: Word \"" + word + "\" not in vocab"
+          let wordID = vocabMap[word]
+          result.push(this.embeddings[wordID])
+        }
+        while (result.length < CONFIG.window_size) result.push(this.embeddings[vocabMap["<PAD>"]])
+        return result
+      }
+      runFilter(filter, input) {
+        let weights = filter.weights
+        let max = 0
+        for (let i = 0; i < weights.length; i++) {
+          for (let j = 0; j < weights[i].length; j++) {
+            max = Math.max(max,input[i][j] * weights[i][j]) // todo: weighted average
+          }
+        }
+        return max
+      }
+      forwards(string) {
+        let tokenized = this.tokenize(string)
+        
+        // run filters
+        for (let filter of this.filters) {
+          for (let start = 0; start < tokenized.length - CONFIG.window_size; start++) {
+            filter
+          }
+        }
+      }
     }
 
     function initData() {
+      vocabRaw.push("<PAD>")
       vocabLength = vocabRaw.length
       for (let i = 0; i < vocabLength; i++) {
         vocabMap[vocabRaw[i]] = i
       }
+
       trainingData = []
       for (let data of trainingDataRaw) {
         if (data.label == "positive" || data.label == "negative") {
@@ -106,6 +142,7 @@
     function start() {
       initData()
       model = new Model()
+      model.tokenize("")
     }
     fetchData()
   </script>
