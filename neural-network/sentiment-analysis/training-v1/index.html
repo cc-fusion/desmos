@@ -30,12 +30,17 @@
       embedding_dim: 8,
       window_size: 3,
       num_filters: 16,
+      learning_rate: 0.05,
     }
 
     let vocabMap = {}
     let vocabLength
     let trainingData = []
     let model
+
+    function sigmoid(x) {
+      return 1 / (1 + Math.exp(-x))
+    }
 
     async function fetchData() {
       try {
@@ -101,22 +106,97 @@
       }
       runFilter(filter, input) {
         let weights = filter.weights
-        let max = 0
+        let sum = 0
         for (let i = 0; i < weights.length; i++) {
           for (let j = 0; j < weights[i].length; j++) {
-            max = Math.max(max,input[i][j] * weights[i][j]) // todo: weighted average
+            sum += input[i][j] * weights[i][j]
           }
         }
-        return max
+        return sum + filter.bias
       }
-      forwards(string) {
-        let tokenized = this.tokenize(string)
+      forwards(input) {
+        let tokenized
+        if (typeof input == "string") {
+          tokenized = this.tokenize(input)
+        } else {
+          tokenized = input
+        }
         
         // run filters
+        let filtered = []
         for (let filter of this.filters) {
-          for (let start = 0; start < tokenized.length - CONFIG.window_size; start++) {
-            filter
+          let max = -1/0
+          for (let start = 0; start <= tokenized.length - CONFIG.window_size; start++) {
+            max = Math.max(max, this.runFilter(filter, tokenized.slice(start, start + CONFIG.window_size)))
           }
+          filtered.push(max)
+        }
+
+        let result = 0
+        for (let i = 0; i < filtered.length; i++) {
+          result += this.output.weights[i] * filtered[i]
+        }
+        return sigmoid(result + this.output.bias)
+      }
+      isPadding(token) {return token.every(item => item === 0)}
+      train(input, expected) {
+        let tokenized
+        if (typeof input == "string") {
+          tokenized = this.tokenize(input)
+        } else {
+          tokenized = input
+        }
+        
+        // forwards pass
+
+        // run filters
+        let filtered = []
+        let filteredIndices = []
+        for (let filter of this.filters) {
+          let max = -1/0
+          let maxIdx = 0
+          for (let start = 0; start <= tokenized.length - CONFIG.window_size; start++) {
+            let value = this.runFilter(filter, tokenized.slice(start, start + CONFIG.window_size))
+            if (value > max) {
+              max = value
+              maxIdx = start
+            }
+          }
+          filtered.push(max)
+          filteredIndices.push(maxIdx)
+        }
+
+        let result = 0
+        for (let i = 0; i < filtered.length; i++) {
+          result += this.output.weights[i] * filtered[i]
+        }
+        let originalOutputWeights = [...this.output.weights]
+        
+        let prediction = sigmoid(result + this.output.bias)
+        
+        // backwards pass
+
+        let error = prediction - expected
+
+        for (let i = 0; i < CONFIG.num_filters; i++) {
+          this.output.weights[i] -= CONFIG.learning_rate * error * filtered[i]
+        }
+        this.output.bias -= CONFIG.learning_rate * error
+
+        for (let f = 0; f < CONFIG.num_filters; f++) {
+          let currentFilter = this.filters[f]
+          let activeWindowIdx = filteredIndices[f]
+          let filterError = error * originalOutputWeights[f]
+          for (let i = 0; i < CONFIG.window_size; i++) {
+            for (let j = 0; j < CONFIG.embedding_dim; j++) {
+              let wordEmbedding = tokenized[activeWindowIdx + i]
+              let tempFilterWeight = currentFilter.weights[i][j]
+
+              currentFilter.weights[i][j] -= CONFIG.learning_rate * filterError * wordEmbedding[j]
+              if (!this.isPadding(wordEmbedding)) wordEmbedding[j] -= CONFIG.learning_rate * filterError * tempFilterWeight 
+            }
+          }
+          currentFilter.bias -= CONFIG.learning_rate * filterError
         }
       }
     }
@@ -132,8 +212,8 @@
       for (let data of trainingDataRaw) {
         if (data.label == "positive" || data.label == "negative") {
           trainingData.push({
-            "text": data.text.split(" ").map(word => vocabMap[word]),
-            "label": data.label == "positive" ? 1 : 0
+            "input": data.text,
+            "expected": data.label == "positive" ? 1 : 0
           })
         }
       }
@@ -142,7 +222,6 @@
     function start() {
       initData()
       model = new Model()
-      model.tokenize("")
     }
     fetchData()
   </script>
