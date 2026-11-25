@@ -13,10 +13,14 @@
 </head>
 
 <body>
+  <button id="train">Train</button><br><br>
+  <input id="iterationsInput" value="1"><button id="trainAsync">Train (async)</button><br><br>
+  <input id="testString"><button id="runModel">Run model</button><br><br>
+  
   <pre id="log"></pre>
   <script>
     function log() {
-      document.getElementById("log").innerText += [...arguments].join("\t")
+      document.getElementById("log").innerText = [...arguments].join("\t") + "\n" + document.getElementById("log").innerText
     }
     addEventListener("error", (e) => {
       log(e.message)
@@ -223,7 +227,46 @@
       initData()
       model = new Model()
     }
+    function train() {
+      for (let data of trainingData) {
+        model.train(data.input, data.expected)
+      }
+    }
+    function asyncTrain(iterations, callback) {
+      return new Promise((res) => {
+        let i = 0
+        let interval = setInterval(() => {
+          callback(i, false)
+          for (let x = 0; x < iterations; x++) {
+            if (i >= trainingData.length) {
+              res()
+              clearInterval(interval)
+              callback(i, true)
+              return
+            }
+            let data = trainingData[i]
+            model.train(data.input, data.expected)
+            i++
+          }
+        })
+      })
+    }
+    
     fetchData()
+
+    document.getElementById("train").addEventListener("click", train)
+    document.getElementById("trainAsync").addEventListener("click", () => {
+      asyncTrain(parseInt(document.getElementById("iterationsInput").value), (i, done) => {
+        if (done) {
+          log("Completed training pass")
+        } else {
+          log(`Training in progress: ${i}/${trainingData.length} (${Math.floor(i/trainingData.length*100*10)/10}% done)`)
+        }
+      })
+    })
+    document.getElementById("runModel").addEventListener("click", (e) => {
+      log(model.forwards(document.getElementById("testString").value))
+    })
   </script>
 </body>
 
